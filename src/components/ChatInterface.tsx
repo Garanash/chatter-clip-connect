@@ -63,11 +63,13 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       return;
     }
 
-    // Приводим данные к правильному типу
+    // Правильно преобразуем данные из базы в тип Message
     const typedMessages: Message[] = (data || []).map(msg => ({
-      ...msg,
+      id: msg.id,
+      content: msg.content,
       role: msg.role as 'user' | 'assistant',
-      attachments: msg.attachments || []
+      attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
+      created_at: msg.created_at || new Date().toISOString()
     }));
 
     setMessages(typedMessages);
@@ -88,6 +90,13 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     setLoading(true);
 
     try {
+      // Подготавливаем данные вложений
+      const attachmentsData = attachedFiles.map(f => ({ 
+        name: f.name, 
+        size: f.size, 
+        type: f.type 
+      }));
+
       // Добавляем сообщение пользователя
       const { data: userMessage, error: userError } = await supabase
         .from('messages')
@@ -96,7 +105,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
             chat_id: chatId,
             content: inputValue,
             role: 'user',
-            attachments: attachedFiles.map(f => ({ name: f.name, size: f.size, type: f.type }))
+            attachments: attachmentsData
           }
         ])
         .select()
@@ -105,9 +114,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       if (userError) throw userError;
 
       const typedUserMessage: Message = {
-        ...userMessage,
+        id: userMessage.id,
+        content: userMessage.content,
         role: 'user',
-        attachments: userMessage.attachments || []
+        attachments: Array.isArray(userMessage.attachments) ? userMessage.attachments : [],
+        created_at: userMessage.created_at || new Date().toISOString()
       };
 
       setMessages(prev => [...prev, typedUserMessage]);
@@ -145,9 +156,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       if (botError) throw botError;
 
       const typedBotMessage: Message = {
-        ...botMessage,
+        id: botMessage.id,
+        content: botMessage.content,
         role: 'assistant',
-        attachments: botMessage.attachments || []
+        attachments: Array.isArray(botMessage.attachments) ? botMessage.attachments : [],
+        created_at: botMessage.created_at || new Date().toISOString()
       };
 
       setMessages(prev => [...prev, typedBotMessage]);
