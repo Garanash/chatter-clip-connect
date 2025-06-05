@@ -63,7 +63,14 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       return;
     }
 
-    setMessages(data || []);
+    // Приводим данные к правильному типу
+    const typedMessages: Message[] = (data || []).map(msg => ({
+      ...msg,
+      role: msg.role as 'user' | 'assistant',
+      attachments: msg.attachments || []
+    }));
+
+    setMessages(typedMessages);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,14 +104,29 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
       if (userError) throw userError;
 
-      setMessages(prev => [...prev, userMessage]);
+      const typedUserMessage: Message = {
+        ...userMessage,
+        role: 'user',
+        attachments: userMessage.attachments || []
+      };
+
+      setMessages(prev => [...prev, typedUserMessage]);
+      const currentInput = inputValue;
       setInputValue('');
       setAttachedFiles([]);
 
-      // Имитация ответа API (здесь вы можете интегрировать свой API)
-      const apiResponse = `Получено сообщение: "${inputValue}"${
-        attachedFiles.length > 0 ? ` с ${attachedFiles.length} файлами` : ''
-      }. Это тестовый ответ от API.`;
+      // Вызываем VseGPT API через edge function
+      const { data: apiResponse, error: apiError } = await supabase.functions.invoke('vsegpt-chat', {
+        body: {
+          messages: [...messages, typedUserMessage].map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          prompt: currentInput
+        }
+      });
+
+      if (apiError) throw apiError;
 
       // Добавляем ответ бота
       const { data: botMessage, error: botError } = await supabase
@@ -112,7 +134,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         .insert([
           {
             chat_id: chatId,
-            content: apiResponse,
+            content: apiResponse.response || 'Произошла ошибка при получении ответа',
             role: 'assistant',
             attachments: []
           }
@@ -122,9 +144,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
       if (botError) throw botError;
 
-      setMessages(prev => [...prev, botMessage]);
+      const typedBotMessage: Message = {
+        ...botMessage,
+        role: 'assistant',
+        attachments: botMessage.attachments || []
+      };
+
+      setMessages(prev => [...prev, typedBotMessage]);
 
     } catch (error: any) {
+      console.error('Error sending message:', error);
       toast({
         title: "Ошибка",
         description: "Не удалось отправить сообщение",
@@ -147,7 +176,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       <div className="flex-1 flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-600 mb-2">Добро пожаловать в чат с API</h2>
+          <h2 className="text-xl font-semibold text-gray-600 mb-2">Добро пожаловать в чат с AI</h2>
           <p className="text-gray-500">Выберите чат или создайте новый для начала</p>
         </div>
       </div>
