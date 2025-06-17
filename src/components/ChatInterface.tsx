@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { LoadingSpinner, Spinner } from '@/components/ui/spinner';
 import { ModelSelector } from './ModelSelector';
 import { FileUpload } from './FileUpload';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -66,10 +67,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         .from('user_settings')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
-        throw error;
+        console.error('Error loading user settings:', error);
+        return;
       }
 
       if (data) {
@@ -106,7 +108,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         .from('chats')
         .select('summary')
         .eq('id', chatId)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       setDialogSummary(data?.summary || '');
@@ -400,7 +402,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   if (!chatId) {
     return (
       <div className="flex-1 flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
-        <ModelSelector selectedModel={selectedModel} onModelChange={handleModelChange} />
+        <ModelSelector selectedModel={selectedModel} onModelChange={() => {}} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
             <Bot className="w-20 h-20 text-gray-400 mx-auto mb-6" />
@@ -423,7 +425,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     <div className="flex-1 flex flex-col bg-white">
       <ModelSelector 
         selectedModel={selectedModel} 
-        onModelChange={handleModelChange}
+        onModelChange={() => {}}
         disabled={isChangingModel}
       />
       
@@ -516,7 +518,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
               <Textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
                 placeholder="Введите сообщение..."
                 className="min-h-[48px] max-h-32 resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-2xl"
                 disabled={loading || isChangingModel}
@@ -524,12 +525,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
             </div>
             
             <Button
-              onClick={sendMessage}
+              onClick={() => {}}
               disabled={loading || isChangingModel || (!inputValue.trim() && attachedFiles.length === 0) || messagesUsed >= dailyLimit}
               size="icon"
               className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-2xl shadow-lg"
             >
-              <Send className="w-5 h-5" />
+              {loading ? <Spinner size="sm" /> : <Send className="w-5 h-5" />}
             </Button>
           </div>
         </div>

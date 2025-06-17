@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { LoadingSpinner } from '@/components/ui/spinner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,17 +33,24 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
   const { toast } = useToast();
 
   useEffect(() => {
+    console.log('ChatList: User changed:', user?.id);
     if (user) {
       loadChats();
+    } else {
+      setChats([]);
+      setLoading(false);
     }
   }, [user]);
 
   const loadChats = async () => {
     if (!user) {
+      console.log('ChatList: No user, skipping chat load');
       setLoading(false);
       return;
     }
 
+    console.log('ChatList: Loading chats for user:', user.id);
+    
     try {
       const { data, error } = await supabase
         .from('chats')
@@ -51,7 +59,7 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
         .order('updated_at', { ascending: false });
 
       if (error) {
-        console.error('Ошибка загрузки чатов:', error);
+        console.error('ChatList: Error loading chats:', error);
         toast({
           title: "Ошибка",
           description: "Не удалось загрузить чаты",
@@ -60,9 +68,10 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
         return;
       }
 
+      console.log('ChatList: Loaded chats:', data);
       setChats(data || []);
     } catch (error) {
-      console.error('Неожиданная ошибка при загрузке чатов:', error);
+      console.error('ChatList: Unexpected error loading chats:', error);
       toast({
         title: "Ошибка",
         description: "Произошла неожиданная ошибка",
@@ -79,6 +88,8 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
     if (!user) return;
 
     try {
+      console.log('ChatList: Deleting chat:', chatId);
+      
       // Сначала удаляем сообщения чата
       const { error: messagesError } = await supabase
         .from('messages')
@@ -86,7 +97,7 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
         .eq('chat_id', chatId);
 
       if (messagesError) {
-        console.error('Ошибка удаления сообщений:', messagesError);
+        console.error('ChatList: Error deleting messages:', messagesError);
       }
 
       // Затем удаляем сам чат
@@ -109,7 +120,7 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
         description: "Чат удален",
       });
     } catch (error: any) {
-      console.error('Ошибка удаления чата:', error);
+      console.error('ChatList: Error deleting chat:', error);
       toast({
         title: "Ошибка",
         description: "Не удалось удалить чат",
@@ -119,16 +130,7 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
   };
 
   if (loading) {
-    return (
-      <div className="space-y-2">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="p-3 rounded-lg bg-gray-800 animate-pulse">
-            <div className="h-4 bg-gray-700 rounded mb-2"></div>
-            <div className="h-3 bg-gray-700 rounded w-2/3"></div>
-          </div>
-        ))}
-      </div>
-    );
+    return <LoadingSpinner message="Загрузка чатов..." />;
   }
 
   if (chats.length === 0) {

@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { useChatFolders } from '@/hooks/useChatFolders';
+import { LoadingSpinner } from '@/components/ui/spinner';
 import { FolderCreator } from './chat-folders/FolderCreator';
 import { FolderItem } from './chat-folders/FolderItem';
 import { ChatItem } from './chat-folders/ChatItem';
@@ -18,7 +19,7 @@ export function ChatFolderList({ currentChatId, onChatSelect, onChatDeleted }: C
   const [editingTitle, setEditingTitle] = useState('');
 
   if (loading) {
-    return <div className="p-4 text-gray-400">Загрузка...</div>;
+    return <LoadingSpinner message="Загрузка папок..." />;
   }
 
   const toggleFolder = (folderId: string) => {

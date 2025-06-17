@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { LoadingSpinner } from "./components/ui/spinner";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Chat from "./pages/Chat";
@@ -15,10 +16,12 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
+  console.log('ProtectedRoute: Current state', { user: !!user, loading });
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Загрузка...</div>
+        <LoadingSpinner message="Проверка авторизации..." />
       </div>
     );
   }
@@ -29,10 +32,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
+  console.log('PublicRoute: Current state', { user: !!user, loading });
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Загрузка...</div>
+        <LoadingSpinner message="Загрузка..." />
       </div>
     );
   }
