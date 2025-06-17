@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Send, Paperclip, Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ModelSelector } from './ModelSelector';
+import { summarizeDialog, shouldSummarize, getMessagesForContext } from '@/utils/dialogSummarization';
 
 interface Message {
   id: string;
@@ -26,6 +26,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [loading, setLoading] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [selectedModel, setSelectedModel] = useState('anthropic/claude-sonnet-4');
+  const [dialogSummary, setDialogSummary] = useState<string>('');
+  const [isChangingModel, setIsChangingModel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
@@ -36,6 +38,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       loadMessages();
     } else {
       setMessages([]);
+      setDialogSummary('');
     }
   }, [chatId]);
 
@@ -74,6 +77,51 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     }));
 
     setMessages(typedMessages);
+
+    // Проверяем, нужна ли суммаризация
+    if (shouldSummarize(typedMessages.length) && !dialogSummary) {
+      const summaryMessages = typedMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      const summary = await summarizeDialog(summaryMessages);
+      setDialogSummary(summary);
+    }
+  };
+
+  const handleModelChange = async (newModel: string) => {
+    if (newModel === selectedModel) return;
+    
+    setIsChangingModel(true);
+    
+    try {
+      // Если есть сообщения, создаем резюме для передачи контекста
+      if (messages.length > 0) {
+        const summaryMessages = messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+        
+        const contextSummary = await summarizeDialog(summaryMessages);
+        setDialogSummary(contextSummary);
+        
+        toast({
+          title: "Модель изменена",
+          description: `Переключение на ${newModel}. Контекст диалога сохранен.`,
+        });
+      }
+      
+      setSelectedModel(newModel);
+    } catch (error) {
+      console.error('Ошибка при смене модели:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось сменить модель",
+        variant: "destructive",
+      });
+    } finally {
+      setIsChangingModel(false);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,13 +211,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       setInputValue('');
       setAttachedFiles([]);
 
+      // Подготавливаем сообщения с учетом суммаризации
+      const allMessages = [...messages, typedUserMessage];
+      const contextMessages = getMessagesForContext(
+        allMessages.map(msg => ({ role: msg.role, content: msg.content })),
+        dialogSummary
+      );
+
       const { data: apiResponse, error: apiError } = await supabase.functions.invoke('vsegpt-chat', {
         body: {
-          messages: [...messages, typedUserMessage].map(msg => ({
-            role: msg.role,
-            content: msg.content,
-            attachments: msg.attachments
-          })),
+          messages: contextMessages,
           prompt: currentInput,
           model: selectedModel
         }
@@ -202,6 +253,17 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
       setMessages(prev => [...prev, typedBotMessage]);
 
+      // Проверяем, нужна ли новая суммаризация
+      const newMessageCount = allMessages.length + 1;
+      if (shouldSummarize(newMessageCount) && !dialogSummary) {
+        const summaryMessages = [...allMessages, typedBotMessage].map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+        const newSummary = await summarizeDialog(summaryMessages);
+        setDialogSummary(newSummary);
+      }
+
     } catch (error: any) {
       console.error('Error sending message:', error);
       toast({
@@ -224,7 +286,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   if (!chatId) {
     return (
       <div className="flex-1 flex flex-col bg-gray-50">
-        <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+        <ModelSelector selectedModel={selectedModel} onModelChange={handleModelChange} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -238,7 +300,21 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   return (
     <div className="flex-1 flex flex-col bg-white">
-      <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+      <ModelSelector 
+        selectedModel={selectedModel} 
+        onModelChange={handleModelChange}
+        disabled={isChangingModel}
+      />
+      
+      {dialogSummary && (
+        <div className="bg-blue-50 border-b border-blue-200 p-3">
+          <div className="max-w-4xl mx-auto">
+            <p className="text-sm text-blue-700">
+              <strong>Контекст диалога:</strong> {dialogSummary}
+            </p>
+          </div>
+        </div>
+      )}
       
       {/* Сообщения */}
       <div className="flex-1 overflow-y-auto p-4">
@@ -342,12 +418,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
               onKeyPress={handleKeyPress}
               placeholder="Введите сообщение..."
               className="flex-1 min-h-[40px] max-h-32 resize-none"
-              disabled={loading}
+              disabled={loading || isChangingModel}
             />
             
             <Button
               onClick={sendMessage}
-              disabled={loading || (!inputValue.trim() && attachedFiles.length === 0)}
+              disabled={loading || isChangingModel || (!inputValue.trim() && attachedFiles.length === 0)}
               size="icon"
             >
               <Send className="w-4 h-4" />

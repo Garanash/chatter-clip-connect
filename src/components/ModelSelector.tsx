@@ -28,18 +28,17 @@ const models: Model[] = [
 interface ModelSelectorProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
+  disabled?: boolean;
 }
 
-export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
+export function ModelSelector({ selectedModel, onModelChange, disabled = false }: ModelSelectorProps) {
   const selectedModelInfo = models.find(m => m.id === selectedModel);
 
   return (
     <div className="flex items-center gap-2 p-2 border-b">
       <Settings className="w-4 h-4 text-gray-500" />
       <span className="text-sm text-gray-600">Модель:</span>
-      <Select value={selectedModel} onValueChange={onModelChange}>
+      <Select value={selectedModel} onValueChange={onModelChange} disabled={disabled}>
         <SelectTrigger className="w-[300px]">
           <SelectValue placeholder="Выберите модель">
             {selectedModelInfo?.name || 'Выберите модель'}
@@ -56,6 +55,9 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
           ))}
         </SelectContent>
       </Select>
+      {disabled && (
+        <span className="text-xs text-gray-500">Смена модели...</span>
+      )}
     </div>
   );
 }
