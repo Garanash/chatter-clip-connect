@@ -1,17 +1,10 @@
 
-import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, Settings, LogOut, Users, User } from 'lucide-react';
+import { Plus, Settings, LogOut, Users, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-interface Chat {
-  id: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-}
+import { ChatList } from './ChatList';
 
 interface ChatSidebarProps {
   currentChatId: string | null;
@@ -22,36 +15,8 @@ interface ChatSidebarProps {
 }
 
 export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPanel, onProfilePanel }: ChatSidebarProps) {
-  const [chats, setChats] = useState<Chat[]>([]);
   const { user, profile, signOut } = useAuth();
   const { toast } = useToast();
-
-  useEffect(() => {
-    if (user) {
-      loadChats();
-    }
-  }, [user]);
-
-  const loadChats = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('chats')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить чаты",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setChats(data || []);
-  };
 
   const handleNewChat = async () => {
     if (!user) return;
@@ -76,7 +41,6 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPan
       return;
     }
 
-    setChats(prev => [data, ...prev]);
     onNewChat();
     onChatSelect(data.id);
   };
@@ -95,27 +59,11 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPan
 
       <div className="flex-1 overflow-y-auto p-4">
         <h3 className="text-sm font-semibold text-gray-400 mb-3">История чатов</h3>
-        <div className="space-y-2">
-          {chats.map((chat) => (
-            <button
-              key={chat.id}
-              onClick={() => onChatSelect(chat.id)}
-              className={`w-full text-left p-3 rounded-lg hover:bg-gray-800 transition-colors ${
-                currentChatId === chat.id ? 'bg-gray-700' : ''
-              }`}
-            >
-              <div className="flex items-center">
-                <MessageSquare className="w-4 h-4 mr-3 text-gray-400" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{chat.title}</div>
-                  <div className="text-xs text-gray-400">
-                    {new Date(chat.updated_at).toLocaleDateString('ru-RU')}
-                  </div>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
+        <ChatList
+          currentChatId={currentChatId}
+          onChatSelect={onChatSelect}
+          onChatDeleted={onNewChat}
+        />
       </div>
 
       <div className="p-4 border-t border-gray-700 space-y-2">
@@ -139,7 +87,7 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPan
           </Button>
         )}
         
-        <div className="text-sm text-gray-400 px-2">
+        <div className="text-sm text-gray-400 px-2 truncate">
           {user?.email}
         </div>
         

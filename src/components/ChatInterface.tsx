@@ -1,12 +1,13 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { Send, Paperclip, Bot, User } from 'lucide-react';
+import { Send, Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ModelSelector } from './ModelSelector';
+import { FileUpload } from './FileUpload';
 import { summarizeDialog, shouldSummarize, getMessagesForContext } from '@/utils/dialogSummarization';
 
 interface Message {
@@ -30,7 +31,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [dialogSummary, setDialogSummary] = useState<string>('');
   const [isChangingModel, setIsChangingModel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -112,7 +112,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
     setMessages(typedMessages);
 
-    // Проверяем, нужна ли суммаризация для этого чата
     if (shouldSummarize(typedMessages.length) && !dialogSummary) {
       const summaryMessages = typedMessages.map(msg => ({
         role: msg.role,
@@ -130,7 +129,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     setIsChangingModel(true);
     
     try {
-      // Если есть сообщения в текущем чате, создаем резюме для сохранения контекста
       if (messages.length > 0) {
         const summaryMessages = messages.map(msg => ({
           role: msg.role,
@@ -160,15 +158,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setAttachedFiles(prev => [...prev, ...files]);
-  };
-
-  const removeFile = (index: number) => {
-    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
   const uploadFiles = async (files: File[]) => {
     const uploadedFiles = [];
     
@@ -188,11 +177,19 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
           .from('chat-files')
           .getPublicUrl(filePath);
 
+        // Конвертируем файл в base64 для отправки в API
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
         uploadedFiles.push({
           name: file.name,
           size: file.size,
           type: file.type,
-          url: publicUrl
+          url: publicUrl,
+          base64: base64
         });
       } catch (error: any) {
         console.error('Ошибка загрузки файла:', error);
@@ -247,14 +244,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       setInputValue('');
       setAttachedFiles([]);
 
-      // Подготавливаем сообщения с учетом суммаризации для этого чата
       const allMessages = [...messages, typedUserMessage];
       const contextMessages = getMessagesForContext(
         allMessages.map(msg => ({ role: msg.role, content: msg.content })),
         dialogSummary
       );
 
-      // Обновляем статистику использования модели
       try {
         await supabase.rpc('update_model_usage', { model_name: selectedModel });
       } catch (error) {
@@ -265,7 +260,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         body: {
           messages: contextMessages,
           prompt: currentInput,
-          model: selectedModel
+          model: selectedModel,
+          attachments: attachmentsData
         }
       });
 
@@ -296,7 +292,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
       setMessages(prev => [...prev, typedBotMessage]);
 
-      // Проверяем, нужна ли новая суммаризация для этого чата
       const newMessageCount = allMessages.length + 1;
       if (shouldSummarize(newMessageCount) && !dialogSummary) {
         const summaryMessages = [...allMessages, typedBotMessage].map(msg => ({
@@ -329,13 +324,20 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   if (!chatId) {
     return (
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
         <ModelSelector selectedModel={selectedModel} onModelChange={handleModelChange} />
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-600 mb-2">Добро пожаловать в чат с AI</h2>
-            <p className="text-gray-500">Выберите чат или создайте новый для начала</p>
+          <div className="text-center max-w-md">
+            <Bot className="w-20 h-20 text-gray-400 mx-auto mb-6" />
+            <h2 className="text-2xl font-bold text-gray-700 mb-3">Добро пожаловать в чат с AI</h2>
+            <p className="text-gray-500 mb-6">Выберите чат или создайте новый для начала общения с искусственным интеллектом</p>
+            <div className="bg-white rounded-lg p-4 shadow-sm border">
+              <p className="text-sm text-gray-600">
+                🎯 Поддерживаются изображения, PDF и текстовые файлы<br/>
+                🧠 Контекст сохраняется в каждом отдельном диалоге<br/>
+                ⚡ Быстрые и точные ответы от современных AI моделей
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -351,58 +353,58 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       />
       
       {dialogSummary && (
-        <div className="bg-blue-50 border-b border-blue-200 p-3">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 p-4">
           <div className="max-w-4xl mx-auto">
-            <p className="text-sm text-blue-700">
-              <strong>Контекст диалога:</strong> {dialogSummary}
+            <p className="text-sm text-blue-800">
+              <strong>💭 Контекст диалога:</strong> {dialogSummary}
             </p>
           </div>
         </div>
       )}
       
-      {/* Сообщения */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-4xl mx-auto space-y-4">
+      <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-gray-50 to-white">
+        <div className="max-w-4xl mx-auto space-y-6">
           {messages.map((message) => (
             <div
               key={message.id}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`flex max-w-xs lg:max-w-md ${
+                className={`flex max-w-xs lg:max-w-2xl ${
                   message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                 }`}
               >
                 <div
-                  className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                    message.role === 'user' ? 'bg-blue-500 ml-2' : 'bg-gray-500 mr-2'
+                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-md ${
+                    message.role === 'user' ? 'bg-blue-500 ml-3' : 'bg-gray-600 mr-3'
                   }`}
                 >
                   {message.role === 'user' ? (
-                    <User className="w-4 h-4 text-white" />
+                    <User className="w-5 h-5 text-white" />
                   ) : (
-                    <Bot className="w-4 h-4 text-white" />
+                    <Bot className="w-5 h-5 text-white" />
                   )}
                 </div>
                 <div
-                  className={`px-4 py-2 rounded-lg ${
+                  className={`px-6 py-4 rounded-2xl shadow-sm ${
                     message.role === 'user'
                       ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-800'
+                      : 'bg-white text-gray-800 border border-gray-200'
                   }`}
                 >
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
                   {message.attachments.length > 0 && (
-                    <div className="mt-2 space-y-1">
+                    <div className="mt-3 space-y-2">
                       {message.attachments.map((attachment: any, idx: number) => (
-                        <div key={idx} className="text-sm opacity-75">
-                          📎 {attachment.name}
+                        <div key={idx} className={`text-sm ${message.role === 'user' ? 'text-blue-100' : 'text-gray-600'} flex items-center`}>
+                          <Paperclip className="w-4 h-4 mr-2" />
+                          {attachment.name}
                           {attachment.url && (
                             <a 
                               href={attachment.url} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="ml-2 underline"
+                              className="ml-2 underline hover:no-underline"
                             >
                               открыть
                             </a>
@@ -419,58 +421,33 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         </div>
       </div>
 
-      {/* Ввод сообщения */}
-      <div className="border-t bg-white p-4">
+      <div className="border-t bg-white p-6">
         <div className="max-w-4xl mx-auto">
-          {attachedFiles.length > 0 && (
-            <div className="mb-4 space-y-2">
-              {attachedFiles.map((file, index) => (
-                <div key={index} className="flex items-center justify-between bg-gray-100 p-2 rounded">
-                  <span className="text-sm">{file.name}</span>
-                  <Button
-                    onClick={() => removeFile(index)}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    ✕
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <div className="flex gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              variant="outline"
-              size="icon"
-            >
-              <Paperclip className="w-4 h-4" />
-            </Button>
-            
-            <Textarea
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Введите сообщение..."
-              className="flex-1 min-h-[40px] max-h-32 resize-none"
+          <div className="flex gap-4">
+            <FileUpload
+              attachedFiles={attachedFiles}
+              onFilesChange={setAttachedFiles}
               disabled={loading || isChangingModel}
             />
+            
+            <div className="flex-1">
+              <Textarea
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Введите сообщение..."
+                className="min-h-[48px] max-h-32 resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                disabled={loading || isChangingModel}
+              />
+            </div>
             
             <Button
               onClick={sendMessage}
               disabled={loading || isChangingModel || (!inputValue.trim() && attachedFiles.length === 0)}
               size="icon"
+              className="h-12 w-12 bg-blue-500 hover:bg-blue-600"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5" />
             </Button>
           </div>
         </div>
