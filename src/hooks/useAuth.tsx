@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { LoadingSpinner } from '@/components/ui/spinner';
 
 interface Profile {
   id: string;
@@ -27,9 +28,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
     console.log('AuthProvider: Initializing auth state');
+    
+    let mounted = true;
     
     // Get initial session
     const getInitialSession = async () => {
@@ -37,9 +41,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data: { session }, error } = await supabase.auth.getSession();
         console.log('AuthProvider: Initial session', { session, error });
         
+        if (!mounted) return;
+        
         if (error) {
           console.error('AuthProvider: Error getting session:', error);
           setLoading(false);
+          setInitializing(false);
           return;
         }
 
@@ -48,10 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await loadProfile(session.user.id);
         } else {
           setLoading(false);
+          setInitializing(false);
         }
       } catch (error) {
         console.error('AuthProvider: Error in getInitialSession:', error);
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          setInitializing(false);
+        }
       }
     };
 
@@ -61,6 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('AuthProvider: Auth state changed', { event, session });
+        if (!mounted) return;
+        
         setUser(session?.user ?? null);
         if (session?.user) {
           await loadProfile(session.user.id);
@@ -71,7 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const loadProfile = async (userId: string) => {
@@ -125,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } finally {
       setLoading(false);
+      setInitializing(false);
     }
   };
 
@@ -180,6 +197,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
   };
+
+  // Показываем загрузку только при первой инициализации
+  if (initializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner message="Инициализация приложения..." />
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>

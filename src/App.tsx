@@ -17,8 +17,6 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
-  console.log('ProtectedRoute: Current state', { user: !!user, loading });
-  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -33,14 +31,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
-  console.log('PublicRoute: Current state', { user: !!user, loading });
-  
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner message="Загрузка..." />
-      </div>
-    );
+    return null; // Не показываем загрузку здесь, она уже показывается в AuthProvider
   }
   
   return !user ? <>{children}</> : <Navigate to="/chat" replace />;
