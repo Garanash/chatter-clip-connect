@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ModelSelector } from './ModelSelector';
 
 interface Message {
   id: string;
@@ -24,6 +25,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [selectedModel, setSelectedModel] = useState('anthropic/claude-sonnet-4');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
@@ -63,7 +65,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       return;
     }
 
-    // Правильно преобразуем данные из базы в тип Message
     const typedMessages: Message[] = (data || []).map(msg => ({
       id: msg.id,
       content: msg.content,
@@ -84,20 +85,56 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const uploadFiles = async (files: File[]) => {
+    const uploadedFiles = [];
+    
+    for (const file of files) {
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${user?.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('chat-files')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('chat-files')
+          .getPublicUrl(filePath);
+
+        uploadedFiles.push({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: publicUrl
+        });
+      } catch (error: any) {
+        console.error('Ошибка загрузки файла:', error);
+        toast({
+          title: "Ошибка",
+          description: `Не удалось загрузить файл ${file.name}`,
+          variant: "destructive",
+        });
+      }
+    }
+    
+    return uploadedFiles;
+  };
+
   const sendMessage = async () => {
     if ((!inputValue.trim() && attachedFiles.length === 0) || !chatId) return;
 
     setLoading(true);
 
     try {
-      // Подготавливаем данные вложений
-      const attachmentsData = attachedFiles.map(f => ({ 
-        name: f.name, 
-        size: f.size, 
-        type: f.type 
-      }));
+      let attachmentsData = [];
+      
+      if (attachedFiles.length > 0) {
+        attachmentsData = await uploadFiles(attachedFiles);
+      }
 
-      // Добавляем сообщение пользователя
       const { data: userMessage, error: userError } = await supabase
         .from('messages')
         .insert([
@@ -126,20 +163,20 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       setInputValue('');
       setAttachedFiles([]);
 
-      // Вызываем VseGPT API через edge function
       const { data: apiResponse, error: apiError } = await supabase.functions.invoke('vsegpt-chat', {
         body: {
           messages: [...messages, typedUserMessage].map(msg => ({
             role: msg.role,
-            content: msg.content
+            content: msg.content,
+            attachments: msg.attachments
           })),
-          prompt: currentInput
+          prompt: currentInput,
+          model: selectedModel
         }
       });
 
       if (apiError) throw apiError;
 
-      // Добавляем ответ бота
       const { data: botMessage, error: botError } = await supabase
         .from('messages')
         .insert([
@@ -186,11 +223,14 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   if (!chatId) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-600 mb-2">Добро пожаловать в чат с AI</h2>
-          <p className="text-gray-500">Выберите чат или создайте новый для начала</p>
+      <div className="flex-1 flex flex-col bg-gray-50">
+        <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-gray-600 mb-2">Добро пожаловать в чат с AI</h2>
+            <p className="text-gray-500">Выберите чат или создайте новый для начала</p>
+          </div>
         </div>
       </div>
     );
@@ -198,6 +238,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   return (
     <div className="flex-1 flex flex-col bg-white">
+      <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+      
       {/* Сообщения */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl mx-auto space-y-4">
@@ -231,8 +273,22 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                 >
                   <div className="whitespace-pre-wrap">{message.content}</div>
                   {message.attachments.length > 0 && (
-                    <div className="mt-2 text-sm opacity-75">
-                      📎 {message.attachments.length} файл(ов)
+                    <div className="mt-2 space-y-1">
+                      {message.attachments.map((attachment: any, idx: number) => (
+                        <div key={idx} className="text-sm opacity-75">
+                          📎 {attachment.name}
+                          {attachment.url && (
+                            <a 
+                              href={attachment.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="ml-2 underline"
+                            >
+                              открыть
+                            </a>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

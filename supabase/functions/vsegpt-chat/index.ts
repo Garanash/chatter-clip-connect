@@ -10,34 +10,44 @@ const corsHeaders = {
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  attachments?: any[];
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { messages, prompt } = await req.json();
+    const { messages, prompt, model = 'anthropic/claude-sonnet-4' } = await req.json();
     const apiKey = Deno.env.get('VSEGPT_API_KEY');
 
     if (!apiKey) {
       throw new Error('VSEGPT_API_KEY не найден в переменных окружения');
     }
 
-    console.log('Отправка запроса к VseGPT API...');
+    console.log('Отправка запроса к VseGPT API с моделью:', model);
 
-    // Формируем сообщения для API
     const apiMessages: ChatMessage[] = messages || [];
     
-    // Добавляем системное сообщение если его нет
     if (apiMessages.length === 0 || apiMessages[0].role !== 'system') {
       apiMessages.unshift({
         role: 'system',
-        content: 'Ты полезный AI-ассистент. Отвечай на русском языке, если пользователь пишет на русском.'
+        content: 'Ты полезный AI-ассистент. Отвечай на русском языке, если пользователь пишет на русском. Если пользователь прикрепил файлы, анализируй их содержимое и отвечай на основе предоставленной информации.'
       });
     }
+
+    // Обработка файлов в сообщениях
+    const processedMessages = apiMessages.map(msg => {
+      if (msg.attachments && msg.attachments.length > 0) {
+        const fileInfo = msg.attachments.map(att => `Файл: ${att.name} (${att.type})`).join(', ');
+        return {
+          ...msg,
+          content: `${msg.content}\n\nПрикрепленные файлы: ${fileInfo}`
+        };
+      }
+      return msg;
+    });
 
     const response = await fetch('https://api.vsegpt.ru/v1/chat/completions', {
       method: 'POST',
@@ -47,8 +57,8 @@ serve(async (req) => {
         'X-Title': 'Lovable Chat App'
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3-haiku',
-        messages: apiMessages,
+        model: model,
+        messages: processedMessages,
         temperature: 0.7,
         max_tokens: 3000,
         n: 1
