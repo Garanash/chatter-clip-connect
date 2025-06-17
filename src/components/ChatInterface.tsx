@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
@@ -177,7 +176,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
           .from('chat-files')
           .getPublicUrl(filePath);
 
-        // Конвертируем файл в base64 для отправки в API
         const base64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
