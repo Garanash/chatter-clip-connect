@@ -234,7 +234,7 @@ export type Database = {
         Returns: undefined
       }
       update_model_usage: {
-        Args: { model_name: string }
+        Args: Record<PropertyKey, never> | { model_name: string }
         Returns: undefined
       }
     }
