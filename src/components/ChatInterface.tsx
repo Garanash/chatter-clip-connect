@@ -36,6 +36,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   useEffect(() => {
     if (chatId) {
       loadMessages();
+      loadChatSummary();
     } else {
       setMessages([]);
       setDialogSummary('');
@@ -48,6 +49,38 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const loadChatSummary = async () => {
+    if (!chatId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('chats')
+        .select('summary')
+        .eq('id', chatId)
+        .single();
+      
+      if (error) throw error;
+      setDialogSummary(data?.summary || '');
+    } catch (error) {
+      console.error('Ошибка загрузки резюме чата:', error);
+    }
+  };
+
+  const saveChatSummary = async (summary: string) => {
+    if (!chatId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('chats')
+        .update({ summary })
+        .eq('id', chatId);
+      
+      if (error) throw error;
+    } catch (error) {
+      console.error('Ошибка сохранения резюме чата:', error);
+    }
   };
 
   const loadMessages = async () => {
@@ -78,7 +111,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
     setMessages(typedMessages);
 
-    // Проверяем, нужна ли суммаризация
+    // Проверяем, нужна ли суммаризация для этого чата
     if (shouldSummarize(typedMessages.length) && !dialogSummary) {
       const summaryMessages = typedMessages.map(msg => ({
         role: msg.role,
@@ -86,16 +119,17 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       }));
       const summary = await summarizeDialog(summaryMessages);
       setDialogSummary(summary);
+      await saveChatSummary(summary);
     }
   };
 
   const handleModelChange = async (newModel: string) => {
-    if (newModel === selectedModel) return;
+    if (newModel === selectedModel || !chatId) return;
     
     setIsChangingModel(true);
     
     try {
-      // Если есть сообщения, создаем резюме для передачи контекста
+      // Если есть сообщения в текущем чате, создаем резюме для сохранения контекста
       if (messages.length > 0) {
         const summaryMessages = messages.map(msg => ({
           role: msg.role,
@@ -104,6 +138,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         
         const contextSummary = await summarizeDialog(summaryMessages);
         setDialogSummary(contextSummary);
+        await saveChatSummary(contextSummary);
         
         toast({
           title: "Модель изменена",
@@ -211,7 +246,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       setInputValue('');
       setAttachedFiles([]);
 
-      // Подготавливаем сообщения с учетом суммаризации
+      // Подготавливаем сообщения с учетом суммаризации для этого чата
       const allMessages = [...messages, typedUserMessage];
       const contextMessages = getMessagesForContext(
         allMessages.map(msg => ({ role: msg.role, content: msg.content })),
@@ -253,7 +288,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
       setMessages(prev => [...prev, typedBotMessage]);
 
-      // Проверяем, нужна ли новая суммаризация
+      // Проверяем, нужна ли новая суммаризация для этого чата
       const newMessageCount = allMessages.length + 1;
       if (shouldSummarize(newMessageCount) && !dialogSummary) {
         const summaryMessages = [...allMessages, typedBotMessage].map(msg => ({
@@ -262,6 +297,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         }));
         const newSummary = await summarizeDialog(summaryMessages);
         setDialogSummary(newSummary);
+        await saveChatSummary(newSummary);
       }
 
     } catch (error: any) {

@@ -20,7 +20,7 @@ export const summarizeDialog = async (messages: Message[]): Promise<string> => {
             content: `Пожалуйста, создай краткое резюме следующего диалога:\n\n${messages.map(msg => `${msg.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${msg.content}`).join('\n\n')}`
           }
         ],
-        model: 'anthropic/claude-sonnet-4' // Используем быструю модель для суммаризации
+        model: 'anthropic/claude-sonnet-4'
       }
     });
 
@@ -63,4 +63,34 @@ export const getMessagesForContext = (messages: Message[], summary?: string): Me
   }
   
   return messages;
+};
+
+// Новые функции для работы с контекстом чата
+export const saveChatSummary = async (chatId: string, summary: string) => {
+  try {
+    const { error } = await supabase
+      .from('chats')
+      .update({ summary })
+      .eq('id', chatId);
+    
+    if (error) throw error;
+  } catch (error) {
+    console.error('Ошибка при сохранении резюме чата:', error);
+  }
+};
+
+export const getChatSummary = async (chatId: string): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('chats')
+      .select('summary')
+      .eq('id', chatId)
+      .single();
+    
+    if (error) throw error;
+    return data?.summary || null;
+  } catch (error) {
+    console.error('Ошибка при получении резюме чата:', error);
+    return null;
+  }
 };

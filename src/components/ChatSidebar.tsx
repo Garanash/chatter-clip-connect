@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, Settings, LogOut, Users } from 'lucide-react';
+import { Plus, MessageSquare, Settings, LogOut, Users, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,9 +18,10 @@ interface ChatSidebarProps {
   onChatSelect: (chatId: string) => void;
   onNewChat: () => void;
   onAdminPanel: () => void;
+  onProfilePanel: () => void;
 }
 
-export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPanel }: ChatSidebarProps) {
+export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPanel, onProfilePanel }: ChatSidebarProps) {
   const [chats, setChats] = useState<Chat[]>([]);
   const { user, profile, signOut } = useAuth();
   const { toast } = useToast();
@@ -118,6 +119,15 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPan
       </div>
 
       <div className="p-4 border-t border-gray-700 space-y-2">
+        <Button
+          onClick={onProfilePanel}
+          variant="ghost"
+          className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+        >
+          <User className="w-4 h-4 mr-2" />
+          Личный кабинет
+        </Button>
+
         {profile?.role === 'admin' && (
           <Button
             onClick={onAdminPanel}
