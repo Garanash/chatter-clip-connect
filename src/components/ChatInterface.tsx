@@ -7,7 +7,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ModelSelector } from './ModelSelector';
 import { FileUpload } from './FileUpload';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { summarizeDialog, shouldSummarize, getMessagesForContext } from '@/utils/dialogSummarization';
+import { getModelIcon } from '@/utils/modelIcons';
 
 interface Message {
   id: string;
@@ -29,8 +31,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [selectedModel, setSelectedModel] = useState('anthropic/claude-sonnet-4');
   const [dialogSummary, setDialogSummary] = useState<string>('');
   const [isChangingModel, setIsChangingModel] = useState(false);
+  const [chatBackground, setChatBackground] = useState('default');
+  const [dailyLimit, setDailyLimit] = useState(30);
+  const [messagesUsed, setMessagesUsed] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,8 +49,50 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   }, [chatId]);
 
   useEffect(() => {
+    if (user) {
+      loadUserSettings();
+    }
+  }, [user]);
+
+  useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const loadUserSettings = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (data) {
+        setChatBackground(data.chat_background || 'default');
+        setDailyLimit(data.daily_message_limit || 30);
+        setMessagesUsed(data.messages_sent_today || 0);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки настроек пользователя:', error);
+    }
+  };
+
+  const getBackgroundClass = (background: string) => {
+    const backgrounds: { [key: string]: string } = {
+      'default': 'bg-gradient-to-b from-gray-50 to-white',
+      'ocean': 'bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600',
+      'sunset': 'bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600',
+      'forest': 'bg-gradient-to-br from-green-400 via-green-500 to-green-600',
+      'space': 'bg-gradient-to-br from-purple-900 via-blue-900 to-black',
+      'lavender': 'bg-gradient-to-br from-purple-300 via-purple-400 to-purple-500'
+    };
+    return backgrounds[background] || backgrounds['default'];
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -205,6 +252,26 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const sendMessage = async () => {
     if ((!inputValue.trim() && attachedFiles.length === 0) || !chatId) return;
 
+    // Проверяем лимит сообщений
+    try {
+      const { data: canSend, error } = await supabase.rpc('check_daily_message_limit', {
+        user_uuid: user?.id
+      });
+
+      if (error) throw error;
+
+      if (!canSend) {
+        toast({
+          title: "Лимит исчерпан",
+          description: `Вы достигли дневного лимита в ${dailyLimit} сообщений. Попробуйте завтра.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } catch (error) {
+      console.error('Ошибка проверки лимита:', error);
+    }
+
     setLoading(true);
 
     try {
@@ -241,6 +308,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       const currentInput = inputValue;
       setInputValue('');
       setAttachedFiles([]);
+
+      // Увеличиваем счетчик сообщений
+      try {
+        await supabase.rpc('increment_daily_message_count', {
+          user_uuid: user?.id
+        });
+        setMessagesUsed(prev => prev + 1);
+      } catch (error) {
+        console.error('Ошибка обновления счетчика сообщений:', error);
+      }
 
       const allMessages = [...messages, typedUserMessage];
       const contextMessages = getMessagesForContext(
@@ -329,7 +406,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
             <Bot className="w-20 h-20 text-gray-400 mx-auto mb-6" />
             <h2 className="text-2xl font-bold text-gray-700 mb-3">Добро пожаловать в чат с AI</h2>
             <p className="text-gray-500 mb-6">Выберите чат или создайте новый для начала общения с искусственным интеллектом</p>
-            <div className="bg-white rounded-lg p-4 shadow-sm border">
+            <div className="bg-white rounded-2xl p-6 shadow-lg border">
               <p className="text-sm text-gray-600">
                 🎯 Поддерживаются изображения, PDF и текстовые файлы<br/>
                 🧠 Контекст сохраняется в каждом отдельном диалоге<br/>
@@ -350,17 +427,21 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         disabled={isChangingModel}
       />
       
-      {dialogSummary && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 p-4">
-          <div className="max-w-4xl mx-auto">
-            <p className="text-sm text-blue-800">
-              <strong>💭 Контекст диалога:</strong> {dialogSummary}
-            </p>
+      {/* Лимит сообщений */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 px-4 py-2">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <div className="text-sm text-blue-800">
+            📊 Сообщений сегодня: {messagesUsed} / {dailyLimit}
           </div>
+          {dialogSummary && (
+            <div className="text-sm text-blue-800">
+              💭 Контекст: {dialogSummary.substring(0, 50)}...
+            </div>
+          )}
         </div>
-      )}
+      </div>
       
-      <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-b from-gray-50 to-white">
+      <div className={`flex-1 overflow-y-auto p-6 ${getBackgroundClass(chatBackground)}`}>
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.map((message) => (
             <div
@@ -372,21 +453,24 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                   message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
                 }`}
               >
-                <div
-                  className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-md ${
-                    message.role === 'user' ? 'bg-blue-500 ml-3' : 'bg-gray-600 mr-3'
-                  }`}
-                >
+                <div className={`flex-shrink-0 ${message.role === 'user' ? 'ml-3' : 'mr-3'}`}>
                   {message.role === 'user' ? (
-                    <User className="w-5 h-5 text-white" />
+                    <Avatar className="w-10 h-10">
+                      <AvatarImage src={profile?.avatar_url} />
+                      <AvatarFallback className="bg-blue-500 text-white">
+                        {profile?.first_name?.[0] || user?.email?.[0] || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
                   ) : (
-                    <Bot className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-600 text-white shadow-md">
+                      <span className="text-lg">{getModelIcon(selectedModel)}</span>
+                    </div>
                   )}
                 </div>
                 <div
-                  className={`px-6 py-4 rounded-2xl shadow-sm ${
+                  className={`px-6 py-4 rounded-2xl shadow-lg ${
                     message.role === 'user'
-                      ? 'bg-blue-500 text-white'
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
                       : 'bg-white text-gray-800 border border-gray-200'
                   }`}
                 >
@@ -434,16 +518,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Введите сообщение..."
-                className="min-h-[48px] max-h-32 resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="min-h-[48px] max-h-32 resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-2xl"
                 disabled={loading || isChangingModel}
               />
             </div>
             
             <Button
               onClick={sendMessage}
-              disabled={loading || isChangingModel || (!inputValue.trim() && attachedFiles.length === 0)}
+              disabled={loading || isChangingModel || (!inputValue.trim() && attachedFiles.length === 0) || messagesUsed >= dailyLimit}
               size="icon"
-              className="h-12 w-12 bg-blue-500 hover:bg-blue-600"
+              className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-2xl shadow-lg"
             >
               <Send className="w-5 h-5" />
             </Button>

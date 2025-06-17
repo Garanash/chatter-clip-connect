@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, Save, Upload } from 'lucide-react';
+import { ChatBackgrounds } from './ChatBackgrounds';
 
 interface UserProfile {
   id: string;
@@ -153,96 +154,106 @@ export function UserProfile() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Личный кабинет
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Аватар */}
-            <div className="flex flex-col items-center space-y-4">
-              <Avatar className="w-24 h-24">
-                <AvatarImage src={formData.avatar_url} />
-                <AvatarFallback>
-                  {formData.first_name?.[0] || user?.email?.[0] || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                  id="avatar-upload"
-                />
-                <label htmlFor="avatar-upload">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={uploading}
-                    className="cursor-pointer"
-                    asChild
-                  >
-                    <div>
-                      <Upload className="w-4 h-4 mr-2" />
-                      {uploading ? 'Загрузка...' : 'Загрузить фото'}
-                    </div>
-                  </Button>
-                </label>
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Основной профиль */}
+        <Card className="rounded-2xl shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Личная информация
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Аватар */}
+              <div className="flex flex-col items-center space-y-4">
+                <Avatar className="w-24 h-24 ring-4 ring-blue-100">
+                  <AvatarImage src={formData.avatar_url} />
+                  <AvatarFallback className="text-lg">
+                    {formData.first_name?.[0] || user?.email?.[0] || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                    id="avatar-upload"
+                  />
+                  <label htmlFor="avatar-upload">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={uploading}
+                      className="cursor-pointer rounded-xl"
+                      asChild
+                    >
+                      <div>
+                        <Upload className="w-4 h-4 mr-2" />
+                        {uploading ? 'Загрузка...' : 'Загрузить фото'}
+                      </div>
+                    </Button>
+                  </label>
+                </div>
               </div>
-            </div>
 
-            {/* Форма */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Форма */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="first_name" className="block text-sm font-medium mb-2">
+                    Имя
+                  </label>
+                  <Input
+                    id="first_name"
+                    value={formData.first_name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
+                    placeholder="Введите имя"
+                    className="rounded-xl"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="last_name" className="block text-sm font-medium mb-2">
+                    Фамилия
+                  </label>
+                  <Input
+                    id="last_name"
+                    value={formData.last_name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
+                    placeholder="Введите фамилию"
+                    className="rounded-xl"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label htmlFor="first_name" className="block text-sm font-medium mb-2">
-                  Имя
+                <label htmlFor="email" className="block text-sm font-medium mb-2">
+                  Email
                 </label>
                 <Input
-                  id="first_name"
-                  value={formData.first_name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, first_name: e.target.value }))}
-                  placeholder="Введите имя"
+                  id="email"
+                  value={user?.email || ''}
+                  disabled
+                  className="bg-gray-100 rounded-xl"
                 />
               </div>
-              
-              <div>
-                <label htmlFor="last_name" className="block text-sm font-medium mb-2">
-                  Фамилия
-                </label>
-                <Input
-                  id="last_name"
-                  value={formData.last_name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, last_name: e.target.value }))}
-                  placeholder="Введите фамилию"
-                />
-              </div>
-            </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">
-                Email
-              </label>
-              <Input
-                id="email"
-                value={user?.email || ''}
-                disabled
-                className="bg-gray-100"
-              />
-            </div>
+              <Button type="submit" disabled={loading} className="w-full rounded-xl">
+                <Save className="w-4 h-4 mr-2" />
+                {loading ? 'Сохранение...' : 'Сохранить изменения'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
 
-            <Button type="submit" disabled={loading} className="w-full">
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? 'Сохранение...' : 'Сохранить изменения'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+        {/* Настройки обоев */}
+        <div>
+          <ChatBackgrounds />
+        </div>
+      </div>
     </div>
   );
 }

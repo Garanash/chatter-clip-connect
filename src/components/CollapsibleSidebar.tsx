@@ -37,17 +37,18 @@ export function CollapsibleSidebar({
         />
       )}
       
+      {/* Кнопка скрытия теперь внизу */}
       <Button
         variant="ghost"
         size="icon"
         onClick={toggleSidebar}
-        className={`absolute top-4 ${isCollapsed ? 'left-2' : 'right-4'} z-10 bg-gray-800 hover:bg-gray-700 text-white`}
+        className={`absolute bottom-4 ${isCollapsed ? 'left-2' : 'right-4'} z-10 bg-gray-800 hover:bg-gray-700 text-white rounded-full shadow-lg`}
       >
         {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </Button>
       
       {isCollapsed && (
-        <div className="w-12 h-screen bg-gray-900 flex flex-col items-center pt-16">
+        <div className="w-12 h-screen bg-gray-900 flex flex-col items-center pt-16 pb-16">
           <div className="text-white text-xs transform -rotate-90 whitespace-nowrap">
             Чаты
           </div>

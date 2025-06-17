@@ -9,10 +9,42 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      chat_folders: {
+        Row: {
+          created_at: string
+          icon_url: string | null
+          id: string
+          name: string
+          position: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          icon_url?: string | null
+          id?: string
+          name: string
+          position?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          icon_url?: string | null
+          id?: string
+          name?: string
+          position?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       chats: {
         Row: {
           created_at: string | null
+          folder_id: string | null
           id: string
+          position: number
           summary: string | null
           title: string
           updated_at: string | null
@@ -20,7 +52,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          folder_id?: string | null
           id?: string
+          position?: number
           summary?: string | null
           title?: string
           updated_at?: string | null
@@ -28,13 +62,22 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          folder_id?: string | null
           id?: string
+          position?: number
           summary?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "chats_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "chat_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "chats_user_id_fkey"
             columns: ["user_id"]
@@ -144,11 +187,52 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          chat_background: string | null
+          created_at: string
+          daily_message_limit: number
+          id: string
+          last_message_date: string | null
+          messages_sent_today: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat_background?: string | null
+          created_at?: string
+          daily_message_limit?: number
+          id?: string
+          last_message_date?: string | null
+          messages_sent_today?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat_background?: string | null
+          created_at?: string
+          daily_message_limit?: number
+          id?: string
+          last_message_date?: string | null
+          messages_sent_today?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_daily_message_limit: {
+        Args: { user_uuid: string }
+        Returns: boolean
+      }
+      increment_daily_message_count: {
+        Args: { user_uuid: string }
+        Returns: undefined
+      }
       update_model_usage: {
         Args: { model_name: string }
         Returns: undefined
