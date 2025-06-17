@@ -14,13 +14,21 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return null; // Загрузка уже показывается в AuthProvider
+  }
   
   return user ? <>{children}</> : <Navigate to="/auth" replace />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return null; // Загрузка уже показывается в AuthProvider
+  }
   
   return !user ? <>{children}</> : <Navigate to="/chat" replace />;
 }
