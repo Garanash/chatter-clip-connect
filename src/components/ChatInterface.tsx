@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Send, Paperclip, Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -252,6 +253,13 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         allMessages.map(msg => ({ role: msg.role, content: msg.content })),
         dialogSummary
       );
+
+      // Обновляем статистику использования модели
+      try {
+        await supabase.rpc('update_model_usage', { model_name: selectedModel });
+      } catch (error) {
+        console.error('Ошибка обновления статистики модели:', error);
+      }
 
       const { data: apiResponse, error: apiError } = await supabase.functions.invoke('vsegpt-chat', {
         body: {

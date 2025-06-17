@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          summary: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -20,6 +21,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          summary?: string | null
           title?: string
           updated_at?: string | null
           user_id: string
@@ -27,6 +29,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          summary?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
@@ -76,23 +79,67 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      model_usage_stats: {
         Row: {
           created_at: string | null
-          email: string | null
           id: string
-          role: string | null
+          model_name: string
+          updated_at: string | null
+          usage_count: number | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
-          email?: string | null
-          id: string
-          role?: string | null
+          id?: string
+          model_name: string
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
-          email?: string | null
           id?: string
+          model_name?: string
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_usage_stats_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          role: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          role?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
           role?: string | null
         }
         Relationships: []
@@ -102,7 +149,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_model_usage: {
+        Args: { model_name: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
