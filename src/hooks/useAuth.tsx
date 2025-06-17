@@ -28,7 +28,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
     console.log('AuthProvider: Initializing auth state');
@@ -45,8 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (error) {
           console.error('AuthProvider: Error getting session:', error);
+          setUser(null);
+          setProfile(null);
           setLoading(false);
-          setInitializing(false);
           return;
         }
 
@@ -54,14 +54,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           await loadProfile(session.user.id);
         } else {
+          setProfile(null);
           setLoading(false);
-          setInitializing(false);
         }
       } catch (error) {
         console.error('AuthProvider: Error in getInitialSession:', error);
         if (mounted) {
+          setUser(null);
+          setProfile(null);
           setLoading(false);
-          setInitializing(false);
         }
       }
     };
@@ -141,7 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } finally {
       setLoading(false);
-      setInitializing(false);
     }
   };
 
@@ -198,8 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
   };
 
-  // Показываем загрузку только при первой инициализации
-  if (initializing) {
+  // Показываем загрузку только при первоначальной инициализации
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner message="Инициализация приложения..." />

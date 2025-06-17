@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
-import { LoadingSpinner } from "./components/ui/spinner";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Chat from "./pages/Chat";
@@ -15,25 +14,13 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner message="Проверка авторизации..." />
-      </div>
-    );
-  }
+  const { user } = useAuth();
   
   return user ? <>{children}</> : <Navigate to="/auth" replace />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  
-  if (loading) {
-    return null; // Не показываем загрузку здесь, она уже показывается в AuthProvider
-  }
+  const { user } = useAuth();
   
   return !user ? <>{children}</> : <Navigate to="/chat" replace />;
 }
