@@ -27,6 +27,7 @@ interface ChatListProps {
 
 export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatListProps) {
   const [chats, setChats] = useState<Chat[]>([]);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -37,24 +38,39 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
   }, [user]);
 
   const loadChats = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('chats')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить чаты",
-        variant: "destructive",
-      });
+    if (!user) {
+      setLoading(false);
       return;
     }
 
-    setChats(data || []);
+    try {
+      const { data, error } = await supabase
+        .from('chats')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Ошибка загрузки чатов:', error);
+        toast({
+          title: "Ошибка",
+          description: "Не удалось загрузить чаты",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setChats(data || []);
+    } catch (error) {
+      console.error('Неожиданная ошибка при загрузке чатов:', error);
+      toast({
+        title: "Ошибка",
+        description: "Произошла неожиданная ошибка",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteChat = async (chatId: string, e: React.MouseEvent) => {
@@ -64,10 +80,14 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
 
     try {
       // Сначала удаляем сообщения чата
-      await supabase
+      const { error: messagesError } = await supabase
         .from('messages')
         .delete()
         .eq('chat_id', chatId);
+
+      if (messagesError) {
+        console.error('Ошибка удаления сообщений:', messagesError);
+      }
 
       // Затем удаляем сам чат
       const { error } = await supabase
@@ -97,6 +117,29 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
       });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="p-3 rounded-lg bg-gray-800 animate-pulse">
+            <div className="h-4 bg-gray-700 rounded mb-2"></div>
+            <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (chats.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-400">
+        <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+        <p>Пока нет чатов</p>
+        <p className="text-sm">Начните новый разговор</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
