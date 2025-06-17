@@ -38,15 +38,28 @@ export const shouldSummarize = (messageCount: number): boolean => {
 
 export const getMessagesForContext = (messages: Message[], summary?: string): Message[] => {
   if (summary && messages.length > 20) {
-    // Если есть резюме и много сообщений, берем резюме + последние 10 сообщений
+    // Если есть резюме и много сообщений, берем последние 10 сообщений
+    // и добавляем контекст к первому сообщению пользователя
     const recentMessages = messages.slice(-10);
-    return [
-      {
-        role: 'system',
-        content: `Контекст предыдущего диалога: ${summary}`
-      },
-      ...recentMessages
-    ];
+    
+    if (recentMessages.length > 0 && recentMessages[0].role === 'user') {
+      // Добавляем контекст к первому сообщению пользователя
+      const contextualMessages = [...recentMessages];
+      contextualMessages[0] = {
+        ...contextualMessages[0],
+        content: `Контекст предыдущего диалога: ${summary}\n\n${contextualMessages[0].content}`
+      };
+      return contextualMessages;
+    } else if (recentMessages.length > 0) {
+      // Если первое сообщение от ассистента, добавляем контекст в начало
+      return [
+        {
+          role: 'user',
+          content: `Контекст предыдущего диалога: ${summary}`
+        },
+        ...recentMessages
+      ];
+    }
   }
   
   return messages;
