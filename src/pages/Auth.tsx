@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bot, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -15,26 +16,84 @@ export default function Auth() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) {
+      toast({
+        title: "Ошибка",
+        description: "Пожалуйста, заполните все поля",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     const { error } = await signIn(email, password);
+    
     if (error) {
-      console.error('Ошибка входа:', error);
+      toast({
+        title: "Ошибка входа",
+        description: error.message || "Не удалось войти в систему",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Успешно!",
+        description: "Вы успешно вошли в систему",
+      });
     }
     setLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
+    if (!email || !password || !confirmPassword) {
+      toast({
+        title: "Ошибка",
+        description: "Пожалуйста, заполните все поля",
+        variant: "destructive",
+      });
       return;
     }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Ошибка",
+        description: "Пароли не совпадают",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Ошибка",
+        description: "Пароль должен содержать минимум 6 символов",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     const { error } = await signUp(email, password);
+    
     if (error) {
-      console.error('Ошибка регистрации:', error);
+      toast({
+        title: "Ошибка регистрации",
+        description: error.message || "Не удалось создать аккаунт",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Аккаунт создан!",
+        description: "Проверьте почту для подтверждения регистрации",
+      });
+      // Clear form
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
     }
     setLoading(false);
   };
@@ -144,7 +203,7 @@ export default function Auth() {
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="signup-password" className="text-sm font-medium text-gray-700">
-                      Пароль
+                      Пароль (минимум 6 символов)
                     </label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
