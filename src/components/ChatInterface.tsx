@@ -12,6 +12,7 @@ import { FileUpload } from './FileUpload';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { summarizeDialog, shouldSummarize, getMessagesForContext } from '@/utils/dialogSummarization';
 import { getModelIcon } from '@/utils/modelIcons';
+import { ChatFolderSelector } from './ChatFolderSelector';
 
 interface Message {
   id: string;
@@ -35,6 +36,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [isChangingModel, setIsChangingModel] = useState(false);
   const [dailyLimit, setDailyLimit] = useState(30);
   const [messagesUsed, setMessagesUsed] = useState(0);
+  const [chatBackground, setChatBackground] = useState('default');
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -86,12 +89,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   const getBackgroundClass = (background: string) => {
     const backgrounds: { [key: string]: string } = {
-      'default': 'bg-gradient-to-b from-gray-50 to-white',
-      'ocean': 'bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600',
-      'sunset': 'bg-gradient-to-br from-orange-400 via-pink-500 to-purple-600',
-      'forest': 'bg-gradient-to-br from-green-400 via-green-500 to-green-600',
+      'default': 'bg-gray-800',
+      'ocean': 'bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700',
+      'sunset': 'bg-gradient-to-br from-orange-900 via-pink-800 to-purple-700',
+      'forest': 'bg-gradient-to-br from-green-900 via-green-800 to-green-700',
       'space': 'bg-gradient-to-br from-purple-900 via-blue-900 to-black',
-      'lavender': 'bg-gradient-to-br from-purple-300 via-purple-400 to-purple-500'
+      'lavender': 'bg-gradient-to-br from-purple-800 via-purple-700 to-purple-600'
     };
     return backgrounds[background] || backgrounds['default'];
   };
@@ -399,10 +402,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     }
   };
 
+  const handleFolderChange = (folderId: string | null) => {
+    setCurrentFolderId(folderId);
+  };
+
   if (!chatId) {
     return (
-      <div className="flex-1 flex flex-col bg-gray-800">
-        <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+      <div className={`flex-1 flex flex-col ${getBackgroundClass(chatBackground)}`}>
+        <div className="p-4 border-b border-gray-600">
+          <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+        </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
             <Bot className="w-20 h-20 text-gray-400 mx-auto mb-6" />
@@ -422,12 +431,20 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-800">
-      <ModelSelector 
-        selectedModel={selectedModel} 
-        onModelChange={setSelectedModel}
-        disabled={isChangingModel}
-      />
+    <div className={`flex-1 flex flex-col ${getBackgroundClass(chatBackground)}`}>
+      <div className="bg-gray-700 border-b border-gray-600 p-4 space-y-4">
+        <ModelSelector 
+          selectedModel={selectedModel} 
+          onModelChange={setSelectedModel}
+          disabled={isChangingModel}
+        />
+        
+        <ChatFolderSelector 
+          currentFolderId={currentFolderId}
+          onFolderChange={handleFolderChange}
+          chatId={chatId}
+        />
+      </div>
       
       {/* Лимит сообщений */}
       <div className="bg-gray-700 border-b border-gray-600 px-4 py-2">
@@ -443,7 +460,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-6 bg-gray-800">
+      <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.map((message) => (
             <div
