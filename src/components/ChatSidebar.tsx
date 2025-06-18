@@ -46,27 +46,9 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPan
   };
 
   return (
-    <div className="w-80 bg-gray-900 text-white flex flex-col h-screen rounded-r-3xl">
-      <div className="p-6 border-b border-gray-700">
-        <Button 
-          onClick={handleNewChat}
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl shadow-lg transform hover:scale-105 transition-all duration-200"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Новый чат
-        </Button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4">
-        <h3 className="text-sm font-semibold text-gray-400 mb-4">История чатов</h3>
-        <ChatFolderList
-          currentChatId={currentChatId}
-          onChatSelect={onChatSelect}
-          onChatDeleted={onNewChat}
-        />
-      </div>
-
-      <div className="p-4 border-t border-gray-700 space-y-2 pb-20">
+    <div className="w-80 bg-gray-900 text-white flex flex-col h-screen">
+      {/* Блок с личными данными и кнопками внизу */}
+      <div className="p-4 border-b border-gray-700 space-y-2 order-2">
         <Button
           onClick={onProfilePanel}
           variant="ghost"
@@ -99,6 +81,26 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPan
           <LogOut className="w-4 h-4 mr-2" />
           Выйти
         </Button>
+      </div>
+
+      {/* Кнопка создания нового чата */}
+      <div className="p-6 border-b border-gray-700 order-1">
+        <Button 
+          onClick={handleNewChat}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-2xl shadow-lg transform hover:scale-105 transition-all duration-200"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Новый чат
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 order-3">
+        <h3 className="text-sm font-semibold text-gray-400 mb-4">История чатов</h3>
+        <ChatFolderList
+          currentChatId={currentChatId}
+          onChatSelect={onChatSelect}
+          onChatDeleted={onNewChat}
+        />
       </div>
     </div>
   );

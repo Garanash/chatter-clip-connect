@@ -100,17 +100,6 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-24 h-24 mb-6">
-            <img 
-              src="/lovable-uploads/64e697f9-afc4-46d4-83af-ca3b0ebd7543.png"
-              alt="NeuroFork"
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">NeuroFork</h1>
-        </div>
-
         <Card className="shadow-xl border-0 bg-gray-800/80 backdrop-blur-sm border border-gray-700">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl font-bold text-white">Добро пожаловать</CardTitle>

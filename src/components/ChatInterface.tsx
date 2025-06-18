@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Paperclip } from 'lucide-react';
+import { Send, Bot, User, Paperclip, Folder } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,7 +11,7 @@ import { FileUpload } from './FileUpload';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { summarizeDialog, shouldSummarize, getMessagesForContext } from '@/utils/dialogSummarization';
 import { getModelIcon } from '@/utils/modelIcons';
-import { ChatFolderSelector } from './ChatFolderSelector';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Message {
   id: string;
@@ -19,6 +19,11 @@ interface Message {
   role: 'user' | 'assistant';
   attachments: any[];
   created_at: string;
+}
+
+interface ChatFolder {
+  id: string;
+  name: string;
 }
 
 interface ChatInterfaceProps {
@@ -36,18 +41,27 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [dailyLimit, setDailyLimit] = useState(30);
   const [messagesUsed, setMessagesUsed] = useState(0);
   const [chatBackground, setChatBackground] = useState('default');
+  const [folders, setFolders] = useState<ChatFolder[]>([]);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [chatTitle, setChatTitle] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user, profile } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
+    loadFolders();
+  }, [user]);
+
+  useEffect(() => {
     if (chatId) {
       loadMessages();
       loadChatSummary();
+      loadChatDetails();
     } else {
       setMessages([]);
       setDialogSummary('');
+      setChatTitle('');
+      setCurrentFolderId(null);
     }
   }, [chatId]);
 
@@ -60,6 +74,69 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const loadFolders = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('chat_folders')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .order('name');
+
+      if (error) throw error;
+      setFolders(data || []);
+    } catch (error) {
+      console.error('Ошибка загрузки папок:', error);
+    }
+  };
+
+  const loadChatDetails = async () => {
+    if (!chatId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('chats')
+        .select('title, folder_id')
+        .eq('id', chatId)
+        .single();
+
+      if (error) throw error;
+      setChatTitle(data.title || '');
+      setCurrentFolderId(data.folder_id);
+    } catch (error) {
+      console.error('Ошибка загрузки данных чата:', error);
+    }
+  };
+
+  const handleFolderChange = async (folderId: string) => {
+    if (!chatId) return;
+
+    const newFolderId = folderId === 'none' ? null : folderId;
+    setCurrentFolderId(newFolderId);
+
+    try {
+      const { error } = await supabase
+        .from('chats')
+        .update({ folder_id: newFolderId })
+        .eq('id', chatId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Успешно",
+        description: "Чат перемещен в папку",
+      });
+    } catch (error) {
+      console.error('Ошибка обновления папки чата:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось переместить чат",
+        variant: "destructive",
+      });
+    }
+  };
 
   const loadUserSettings = async () => {
     if (!user) return;
@@ -256,7 +333,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const sendMessage = async () => {
     if ((!inputValue.trim() && attachedFiles.length === 0) || !chatId || loading) return;
 
-    // Проверяем лимит сообщений
     try {
       const { data: canSend, error } = await supabase.rpc('check_daily_message_limit', {
         user_uuid: user?.id
@@ -313,7 +389,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       setInputValue('');
       setAttachedFiles([]);
 
-      // Увеличиваем счетчик сообщений
       try {
         await supabase.rpc('increment_daily_message_count', {
           user_uuid: user?.id
@@ -401,10 +476,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     }
   };
 
-  const handleFolderChange = (folderId: string | null) => {
-    setCurrentFolderId(folderId);
-  };
-
   if (!chatId) {
     return (
       <div className={`flex-1 flex flex-col ${getBackgroundClass(chatBackground)}`}>
@@ -430,23 +501,41 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   }
 
   return (
-    <div className={`flex-1 flex flex-col ${getBackgroundClass(chatBackground)}`}>
-      <div className="bg-gray-700 border-b border-gray-600 p-4 space-y-4">
+    <div className={`flex-1 flex flex-col ${getBackgroundClass(chatBackground)} min-h-0`}>
+      <div className="bg-gray-700 border-b border-gray-600 p-4 space-y-4 flex-shrink-0">
         <ModelSelector 
           selectedModel={selectedModel} 
-          onModelChange={setSelectedModel}
+          onModelChange={handleModelChange}
           disabled={isChangingModel}
         />
         
-        <ChatFolderSelector 
-          currentFolderId={currentFolderId}
-          onFolderChange={handleFolderChange}
-          chatId={chatId}
-        />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-white">{chatTitle}</h2>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Folder className="w-4 h-4 text-gray-400" />
+            <Select value={currentFolderId || 'none'} onValueChange={handleFolderChange}>
+              <SelectTrigger className="w-[200px] bg-gray-700 border-gray-600 text-white">
+                <SelectValue placeholder="Выберите папку" />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-700 border-gray-600">
+                <SelectItem value="none" className="text-gray-300 hover:bg-gray-600">
+                  Без папки
+                </SelectItem>
+                {folders.map((folder) => (
+                  <SelectItem key={folder.id} value={folder.id} className="text-gray-300 hover:bg-gray-600">
+                    {folder.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
       
-      {/* Лимит сообщений */}
-      <div className="bg-gray-700 border-b border-gray-600 px-4 py-2">
+      <div className="bg-gray-700 border-b border-gray-600 px-4 py-2 flex-shrink-0">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
           <div className="text-sm text-blue-300">
             📊 Сообщений сегодня: {messagesUsed} / {dailyLimit}
@@ -459,7 +548,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         </div>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 min-h-0">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.map((message) => (
             <div
@@ -521,7 +610,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         </div>
       </div>
 
-      <div className="border-t border-gray-600 bg-gray-800 p-6">
+      <div className="border-t border-gray-600 bg-gray-800 p-6 flex-shrink-0">
         <div className="max-w-4xl mx-auto">
           <div className="flex gap-4 items-end">
             <FileUpload

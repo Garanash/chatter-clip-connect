@@ -39,7 +39,7 @@ export default function Chat() {
 
   if (currentView === 'profile') {
     return (
-      <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 max-h-screen">
         <CollapsibleSidebar
           currentChatId={currentChatId}
           onChatSelect={handleChatSelect}
@@ -48,8 +48,8 @@ export default function Chat() {
           onProfilePanel={handleProfilePanel}
         />
         
-        <div className="flex-1 flex flex-col">
-          <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+        <div className="flex-1 flex flex-col min-w-0 max-h-screen">
+          <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button
@@ -84,7 +84,7 @@ export default function Chat() {
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-h-0">
             {profileView === 'profile' ? <UserProfile /> : <UserStats />}
           </div>
         </div>
@@ -93,7 +93,7 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-100 max-h-screen">
       <CollapsibleSidebar
         currentChatId={currentChatId}
         onChatSelect={handleChatSelect}
