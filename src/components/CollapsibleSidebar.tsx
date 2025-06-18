@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,14 +25,8 @@ export function CollapsibleSidebar({
     setIsCollapsed(!isCollapsed);
   };
 
-  const handleCollapsedAreaClick = () => {
-    if (isCollapsed) {
-      setIsCollapsed(false);
-    }
-  };
-
   return (
-    <div className={`relative transition-all duration-300 ${isCollapsed ? 'w-14' : 'w-80'}`}>
+    <div className={`relative transition-all duration-300 ${isCollapsed ? 'w-12' : 'w-80'}`}>
       {!isCollapsed && (
         <ChatSidebar
           currentChatId={currentChatId}
@@ -39,32 +34,24 @@ export function CollapsibleSidebar({
           onNewChat={onNewChat}
           onAdminPanel={onAdminPanel}
           onProfilePanel={onProfilePanel}
-          isCollapsed={false}
         />
       )}
       
+      {/* Кнопка скрытия теперь внизу */}
       <Button
         variant="ghost"
         size="icon"
         onClick={toggleSidebar}
-        className={`absolute bottom-4 ${isCollapsed ? 'left-2' : 'right-4'} z-10 bg-gray-800/90 hover:bg-gray-700 text-white rounded-full shadow-lg backdrop-blur-sm`}
+        className={`absolute bottom-4 ${isCollapsed ? 'left-2' : 'right-4'} z-10 bg-gray-800 hover:bg-gray-700 text-white rounded-full shadow-lg`}
       >
         {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </Button>
       
       {isCollapsed && (
-        <div 
-          className="w-14 h-screen bg-gray-900 cursor-pointer"
-          onClick={handleCollapsedAreaClick}
-        >
-          <ChatSidebar
-            currentChatId={currentChatId}
-            onChatSelect={onChatSelect}
-            onNewChat={onNewChat}
-            onAdminPanel={onAdminPanel}
-            onProfilePanel={onProfilePanel}
-            isCollapsed={true}
-          />
+        <div className="w-12 h-screen bg-gray-900 flex flex-col items-center pt-16 pb-16">
+          <div className="text-white text-xs transform -rotate-90 whitespace-nowrap">
+            Чаты
+          </div>
         </div>
       )}
     </div>

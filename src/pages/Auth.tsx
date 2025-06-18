@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Lock, Eye, EyeOff, AtSign } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Auth() {
-  const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -50,7 +49,7 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nickname || !email || !password || !confirmPassword) {
+    if (!email || !password || !confirmPassword) {
       toast({
         title: "Ошибка",
         description: "Пожалуйста, заполните все поля",
@@ -78,7 +77,7 @@ export default function Auth() {
     }
 
     setLoading(true);
-    const { error } = await signUp(email, password, nickname);
+    const { error } = await signUp(email, password);
     
     if (error) {
       toast({
@@ -91,7 +90,6 @@ export default function Auth() {
         title: "Аккаунт создан!",
         description: "Проверьте почту для подтверждения регистрации",
       });
-      setNickname('');
       setEmail('');
       setPassword('');
       setConfirmPassword('');
@@ -125,13 +123,13 @@ export default function Auth() {
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="space-y-2">
-                    <label htmlFor="signin-email" className="text-sm font-medium text-gray-300">
+                    <label htmlFor="email" className="text-sm font-medium text-gray-300">
                       Email адрес
                     </label>
                     <div className="relative">
-                      <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <Input
-                        id="signin-email"
+                        id="email"
                         type="email"
                         placeholder="your@email.com"
                         value={email}
@@ -142,13 +140,13 @@ export default function Auth() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label htmlFor="signin-password" className="text-sm font-medium text-gray-300">
+                    <label htmlFor="password" className="text-sm font-medium text-gray-300">
                       Пароль
                     </label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <Input
-                        id="signin-password"
+                        id="password"
                         type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         value={password}
@@ -178,28 +176,11 @@ export default function Auth() {
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="space-y-2">
-                    <label htmlFor="signup-nickname" className="text-sm font-medium text-gray-300">
-                      Никнейм
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input
-                        id="signup-nickname"
-                        type="text"
-                        placeholder="nickname"
-                        value={nickname}
-                        onChange={(e) => setNickname(e.target.value)}
-                        className="pl-10 bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
                     <label htmlFor="signup-email" className="text-sm font-medium text-gray-300">
                       Email адрес
                     </label>
                     <div className="relative">
-                      <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <Input
                         id="signup-email"
                         type="email"

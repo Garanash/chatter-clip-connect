@@ -49,36 +49,36 @@ export default function Chat() {
         />
         
         <div className="flex-1 flex flex-col min-w-0 max-h-screen">
-          <div className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 lg:py-4 shadow-sm flex-shrink-0">
+          <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm flex-shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 lg:gap-4">
+              <div className="flex items-center gap-4">
                 <Button
                   variant="ghost"
                   onClick={handleBackToChat}
-                  className="flex items-center gap-2 hover:bg-gray-100 text-sm lg:text-base"
+                  className="flex items-center gap-2 hover:bg-gray-100"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Назад к чату</span>
+                  Назад к чату
                 </Button>
-                <h1 className="text-lg lg:text-xl font-semibold text-gray-800">Личный кабинет</h1>
+                <h1 className="text-xl font-semibold text-gray-800">Личный кабинет</h1>
               </div>
               
-              <div className="flex gap-1 lg:gap-2">
+              <div className="flex gap-2">
                 <Button
                   variant={profileView === 'profile' ? 'default' : 'ghost'}
                   onClick={() => setProfileView('profile')}
-                  className="flex items-center gap-1 lg:gap-2 text-xs lg:text-sm px-2 lg:px-3"
+                  className="flex items-center gap-2"
                 >
-                  <User className="w-3 h-3 lg:w-4 lg:h-4" />
-                  <span className="hidden sm:inline">Профиль</span>
+                  <User className="w-4 h-4" />
+                  Профиль
                 </Button>
                 <Button
                   variant={profileView === 'stats' ? 'default' : 'ghost'}
                   onClick={() => setProfileView('stats')}
-                  className="flex items-center gap-1 lg:gap-2 text-xs lg:text-sm px-2 lg:px-3"
+                  className="flex items-center gap-2"
                 >
-                  <BarChart className="w-3 h-3 lg:w-4 lg:h-4" />
-                  <span className="hidden sm:inline">Статистика</span>
+                  <BarChart className="w-4 h-4" />
+                  Статистика
                 </Button>
               </div>
             </div>

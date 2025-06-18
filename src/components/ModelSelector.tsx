@@ -47,28 +47,28 @@ export function ModelSelector({ selectedModel, onModelChange, disabled = false }
   };
 
   return (
-    <div className="flex items-center gap-2 p-3 border-b border-gray-200 bg-gray-50">
-      <Settings className="w-4 h-4 text-gray-500" />
-      <span className="text-sm text-gray-600 font-medium">Модель:</span>
+    <div className="flex items-center gap-2 p-4 border-b border-gray-600 bg-gray-800">
+      <Settings className="w-4 h-4 text-gray-400" />
+      <span className="text-sm text-gray-300">Модель:</span>
       <Select value={selectedModel} onValueChange={handleModelChange} disabled={disabled}>
-        <SelectTrigger className="w-[320px] bg-white border-gray-300 text-gray-700 text-sm h-9">
+        <SelectTrigger className="w-[300px] bg-gray-700 border-gray-600 text-white">
           <SelectValue placeholder="Выберите модель">
             {selectedModelInfo?.name || 'Выберите модель'}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="bg-white border-gray-200 max-h-80">
+        <SelectContent className="bg-gray-700 border-gray-600">
           {models.map((model) => (
-            <SelectItem key={model.id} value={model.id} className="text-gray-700 hover:bg-gray-100">
+            <SelectItem key={model.id} value={model.id} className="text-gray-300 hover:bg-gray-600">
               <div className="flex flex-col">
-                <span className="font-medium">{model.name}</span>
-                <span className="text-xs text-gray-500">{model.category}</span>
+                <span className="font-medium text-white">{model.name}</span>
+                <span className="text-xs text-gray-400">{model.category}</span>
               </div>
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
       {disabled && (
-        <span className="text-xs text-gray-500">Смена модели...</span>
+        <span className="text-xs text-gray-400">Смена модели...</span>
       )}
     </div>
   );
