@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Settings } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export interface Model {
   id: string;
@@ -33,30 +34,41 @@ interface ModelSelectorProps {
 
 export function ModelSelector({ selectedModel, onModelChange, disabled = false }: ModelSelectorProps) {
   const selectedModelInfo = models.find(m => m.id === selectedModel);
+  const { toast } = useToast();
+
+  const handleModelChange = (newModel: string) => {
+    if (newModel !== selectedModel) {
+      onModelChange(newModel);
+      toast({
+        title: "Модель изменена",
+        description: `Переключение на ${models.find(m => m.id === newModel)?.name}`,
+      });
+    }
+  };
 
   return (
-    <div className="flex items-center gap-2 p-2 border-b">
-      <Settings className="w-4 h-4 text-gray-500" />
-      <span className="text-sm text-gray-600">Модель:</span>
-      <Select value={selectedModel} onValueChange={onModelChange} disabled={disabled}>
-        <SelectTrigger className="w-[300px]">
+    <div className="flex items-center gap-2 p-4 border-b border-gray-600 bg-gray-800">
+      <Settings className="w-4 h-4 text-gray-400" />
+      <span className="text-sm text-gray-300">Модель:</span>
+      <Select value={selectedModel} onValueChange={handleModelChange} disabled={disabled}>
+        <SelectTrigger className="w-[300px] bg-gray-700 border-gray-600 text-white">
           <SelectValue placeholder="Выберите модель">
             {selectedModelInfo?.name || 'Выберите модель'}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-gray-700 border-gray-600">
           {models.map((model) => (
-            <SelectItem key={model.id} value={model.id}>
+            <SelectItem key={model.id} value={model.id} className="text-gray-300 hover:bg-gray-600">
               <div className="flex flex-col">
-                <span className="font-medium">{model.name}</span>
-                <span className="text-xs text-gray-500">{model.category}</span>
+                <span className="font-medium text-white">{model.name}</span>
+                <span className="text-xs text-gray-400">{model.category}</span>
               </div>
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
       {disabled && (
-        <span className="text-xs text-gray-500">Смена модели...</span>
+        <span className="text-xs text-gray-400">Смена модели...</span>
       )}
     </div>
   );

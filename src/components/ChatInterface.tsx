@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [selectedModel, setSelectedModel] = useState('anthropic/claude-sonnet-4');
   const [dialogSummary, setDialogSummary] = useState<string>('');
   const [isChangingModel, setIsChangingModel] = useState(false);
-  const [chatBackground, setChatBackground] = useState('default');
   const [dailyLimit, setDailyLimit] = useState(30);
   const [messagesUsed, setMessagesUsed] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -252,7 +252,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   };
 
   const sendMessage = async () => {
-    if ((!inputValue.trim() && attachedFiles.length === 0) || !chatId) return;
+    if ((!inputValue.trim() && attachedFiles.length === 0) || !chatId || loading) return;
 
     // Проверяем лимит сообщений
     try {
@@ -401,15 +401,15 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   if (!chatId) {
     return (
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
-        <ModelSelector selectedModel={selectedModel} onModelChange={() => {}} />
+      <div className="flex-1 flex flex-col bg-gray-800">
+        <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md">
             <Bot className="w-20 h-20 text-gray-400 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold text-gray-700 mb-3">Добро пожаловать в чат с AI</h2>
-            <p className="text-gray-500 mb-6">Выберите чат или создайте новый для начала общения с искусственным интеллектом</p>
-            <div className="bg-white rounded-2xl p-6 shadow-lg border">
-              <p className="text-sm text-gray-600">
+            <h2 className="text-2xl font-bold text-white mb-3">Добро пожаловать в чат с AI</h2>
+            <p className="text-gray-400 mb-6">Выберите чат или создайте новый для начала общения с искусственным интеллектом</p>
+            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg border border-gray-600">
+              <p className="text-sm text-gray-300">
                 🎯 Поддерживаются изображения, PDF и текстовые файлы<br/>
                 🧠 Контекст сохраняется в каждом отдельном диалоге<br/>
                 ⚡ Быстрые и точные ответы от современных AI моделей
@@ -422,28 +422,28 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="flex-1 flex flex-col bg-gray-800">
       <ModelSelector 
         selectedModel={selectedModel} 
-        onModelChange={() => {}}
+        onModelChange={setSelectedModel}
         disabled={isChangingModel}
       />
       
       {/* Лимит сообщений */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 px-4 py-2">
+      <div className="bg-gray-700 border-b border-gray-600 px-4 py-2">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="text-sm text-blue-800">
+          <div className="text-sm text-blue-300">
             📊 Сообщений сегодня: {messagesUsed} / {dailyLimit}
           </div>
           {dialogSummary && (
-            <div className="text-sm text-blue-800">
+            <div className="text-sm text-blue-300">
               💭 Контекст: {dialogSummary.substring(0, 50)}...
             </div>
           )}
         </div>
       </div>
       
-      <div className={`flex-1 overflow-y-auto p-6 ${getBackgroundClass(chatBackground)}`}>
+      <div className="flex-1 overflow-y-auto p-6 bg-gray-800">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.map((message) => (
             <div
@@ -473,14 +473,14 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                   className={`px-6 py-4 rounded-2xl shadow-lg ${
                     message.role === 'user'
                       ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-                      : 'bg-white text-gray-800 border border-gray-200'
+                      : 'bg-gray-700 text-gray-100 border border-gray-600'
                   }`}
                 >
                   <div className="whitespace-pre-wrap break-words">{message.content}</div>
                   {message.attachments.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {message.attachments.map((attachment: any, idx: number) => (
-                        <div key={idx} className={`text-sm ${message.role === 'user' ? 'text-blue-100' : 'text-gray-600'} flex items-center`}>
+                        <div key={idx} className={`text-sm ${message.role === 'user' ? 'text-blue-100' : 'text-gray-300'} flex items-center`}>
                           <Paperclip className="w-4 h-4 mr-2" />
                           {attachment.name}
                           {attachment.url && (
@@ -505,33 +505,33 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         </div>
       </div>
 
-      <div className="border-t bg-white p-6">
+      <div className="border-t border-gray-600 bg-gray-800 p-6">
         <div className="max-w-4xl mx-auto">
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-end">
             <FileUpload
               attachedFiles={attachedFiles}
               onFilesChange={setAttachedFiles}
               disabled={loading || isChangingModel}
             />
             
-            <div className="flex-1">
+            <div className="flex-1 relative">
               <Textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
                 placeholder="Введите сообщение..."
-                className="min-h-[48px] max-h-32 resize-none border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-2xl"
+                className="min-h-[60px] max-h-32 resize-none bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 rounded-2xl pr-16"
                 disabled={loading || isChangingModel}
               />
+              <Button
+                onClick={sendMessage}
+                disabled={loading || isChangingModel || (!inputValue.trim() && attachedFiles.length === 0) || messagesUsed >= dailyLimit}
+                size="icon"
+                className="absolute right-2 bottom-2 h-10 w-10 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl shadow-lg"
+              >
+                {loading ? <Spinner size="sm" /> : <Send className="w-4 h-4" />}
+              </Button>
             </div>
-            
-            <Button
-              onClick={() => {}}
-              disabled={loading || isChangingModel || (!inputValue.trim() && attachedFiles.length === 0) || messagesUsed >= dailyLimit}
-              size="icon"
-              className="h-12 w-12 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-2xl shadow-lg"
-            >
-              {loading ? <Spinner size="sm" /> : <Send className="w-5 h-5" />}
-            </Button>
           </div>
         </div>
       </div>

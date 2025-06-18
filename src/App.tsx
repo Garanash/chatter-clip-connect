@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
-import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Chat from "./pages/Chat";
 import NotFound from "./pages/NotFound";
@@ -16,20 +15,14 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
-  if (loading) {
-    return null; // Загрузка уже показывается в AuthProvider
-  }
-  
-  return user ? <>{children}</> : <Navigate to="/auth" replace />;
+  if (loading) return null;
+  return user ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
-  if (loading) {
-    return null; // Загрузка уже показывается в AuthProvider
-  }
-  
+  if (loading) return null;
   return !user ? <>{children}</> : <Navigate to="/chat" replace />;
 }
 
@@ -41,9 +34,8 @@ const App: React.FC = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Index />} />
             <Route 
-              path="/auth" 
+              path="/" 
               element={
                 <PublicRoute>
                   <Auth />
