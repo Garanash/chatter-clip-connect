@@ -1,94 +1,64 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Paperclip, Folder } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { LoadingSpinner, Spinner } from '@/components/ui/spinner';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Send, Edit } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
-import { FileUpload } from './FileUpload';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { summarizeDialog, shouldSummarize, getMessagesForContext } from '@/utils/dialogSummarization';
-import { getModelIcon } from '@/utils/modelIcons';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-interface Message {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  attachments: any[];
-  created_at: string;
-}
-
-interface ChatFolder {
-  id: string;
-  name: string;
-}
+import { ChatFolderSelector } from './ChatFolderSelector';
 
 interface ChatInterfaceProps {
   chatId: string | null;
 }
 
+interface Message {
+  id: string;
+  created_at: string;
+  content: string;
+  role: 'user' | 'assistant';
+  attachments: any[];
+}
+
 export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [selectedModel, setSelectedModel] = useState('anthropic/claude-sonnet-4');
-  const [dialogSummary, setDialogSummary] = useState<string>('');
-  const [isChangingModel, setIsChangingModel] = useState(false);
-  const [dailyLimit, setDailyLimit] = useState(30);
-  const [messagesUsed, setMessagesUsed] = useState(0);
-  const [chatBackground, setChatBackground] = useState('default');
-  const [folders, setFolders] = useState<ChatFolder[]>([]);
-  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [chatTitle, setChatTitle] = useState('');
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('vis-google/gemini-2.5-pro-preview');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [chatTitle, setChatTitle] = useState('Новый чат');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { user, profile } = useAuth();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    loadFolders();
-  }, [user]);
+  const { user } = useAuth();
+  const { id } = useParams();
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (chatId) {
       loadMessages();
-      loadChatSummary();
-      loadChatDetails();
-    } else {
-      setMessages([]);
-      setDialogSummary('');
-      setChatTitle('');
-      setCurrentFolderId(null);
     }
   }, [chatId]);
 
   useEffect(() => {
-    if (user) {
-      loadUserSettings();
+    if (chatId) {
+      loadChatDetails();
     }
-  }, [user]);
+  }, [chatId]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const loadFolders = async () => {
-    if (!user) return;
+  const loadMessages = async () => {
+    if (!chatId) return;
 
     try {
       const { data, error } = await supabase
-        .from('chat_folders')
-        .select('id, name')
-        .eq('user_id', user.id)
-        .order('name');
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setFolders(data || []);
+      setMessages(data || []);
+      scrollToBottom();
     } catch (error) {
-      console.error('Ошибка загрузки папок:', error);
+      console.error('Ошибка загрузки сообщений:', error);
     }
   };
 
@@ -103,542 +73,227 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         .single();
 
       if (error) throw error;
-      setChatTitle(data.title || '');
+      
+      setChatTitle(data.title);
       setCurrentFolderId(data.folder_id);
     } catch (error) {
       console.error('Ошибка загрузки данных чата:', error);
     }
   };
 
-  const handleFolderChange = async (folderId: string) => {
-    if (!chatId) return;
-
-    const newFolderId = folderId === 'none' ? null : folderId;
-    setCurrentFolderId(newFolderId);
-
-    try {
-      const { error } = await supabase
-        .from('chats')
-        .update({ folder_id: newFolderId })
-        .eq('id', chatId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Успешно",
-        description: "Чат перемещен в папку",
-      });
-    } catch (error) {
-      console.error('Ошибка обновления папки чата:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось переместить чат",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const loadUserSettings = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading user settings:', error);
-        return;
-      }
-
-      if (data) {
-        setChatBackground(data.chat_background || 'default');
-        setDailyLimit(data.daily_message_limit || 30);
-        setMessagesUsed(data.messages_sent_today || 0);
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки настроек пользователя:', error);
-    }
-  };
-
-  const getBackgroundClass = (background: string) => {
-    const backgrounds: { [key: string]: string } = {
-      'default': 'bg-gray-800',
-      'ocean': 'bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700',
-      'sunset': 'bg-gradient-to-br from-orange-900 via-pink-800 to-purple-700',
-      'forest': 'bg-gradient-to-br from-green-900 via-green-800 to-green-700',
-      'space': 'bg-gradient-to-br from-purple-900 via-blue-900 to-black',
-      'lavender': 'bg-gradient-to-br from-purple-800 via-purple-700 to-purple-600'
-    };
-    return backgrounds[background] || backgrounds['default'];
+  const handleFolderChange = async (folderId: string | null) => {
+    setCurrentFolderId(folderId);
   };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const loadChatSummary = async () => {
-    if (!chatId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('chats')
-        .select('summary')
-        .eq('id', chatId)
-        .maybeSingle();
-      
-      if (error) throw error;
-      setDialogSummary(data?.summary || '');
-    } catch (error) {
-      console.error('Ошибка загрузки резюме чата:', error);
-    }
-  };
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    if (!inputMessage.trim() || !chatId) return;
 
-  const saveChatSummary = async (summary: string) => {
-    if (!chatId) return;
-    
-    try {
-      const { error } = await supabase
-        .from('chats')
-        .update({ summary })
-        .eq('id', chatId);
-      
-      if (error) throw error;
-    } catch (error) {
-      console.error('Ошибка сохранения резюме чата:', error);
-    }
-  };
+    const userMessage = {
+      id: new Date().getTime().toString(),
+      created_at: new Date().toISOString(),
+      content: inputMessage,
+      role: 'user',
+      attachments: []
+    };
 
-  const loadMessages = async () => {
-    if (!chatId) return;
-
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('chat_id', chatId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить сообщения",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const typedMessages: Message[] = (data || []).map(msg => ({
-      id: msg.id,
-      content: msg.content,
-      role: msg.role as 'user' | 'assistant',
-      attachments: Array.isArray(msg.attachments) ? msg.attachments : [],
-      created_at: msg.created_at || new Date().toISOString()
-    }));
-
-    setMessages(typedMessages);
-
-    if (shouldSummarize(typedMessages.length) && !dialogSummary) {
-      const summaryMessages = typedMessages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-      const summary = await summarizeDialog(summaryMessages);
-      setDialogSummary(summary);
-      await saveChatSummary(summary);
-    }
-  };
-
-  const handleModelChange = async (newModel: string) => {
-    if (newModel === selectedModel || !chatId) return;
-    
-    setIsChangingModel(true);
-    
-    try {
-      if (messages.length > 0) {
-        const summaryMessages = messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
-        
-        const contextSummary = await summarizeDialog(summaryMessages);
-        setDialogSummary(contextSummary);
-        await saveChatSummary(contextSummary);
-        
-        toast({
-          title: "Модель изменена",
-          description: `Переключение на ${newModel}. Контекст диалога сохранен.`,
-        });
-      }
-      
-      setSelectedModel(newModel);
-    } catch (error) {
-      console.error('Ошибка при смене модели:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось сменить модель",
-        variant: "destructive",
-      });
-    } finally {
-      setIsChangingModel(false);
-    }
-  };
-
-  const uploadFiles = async (files: File[]) => {
-    const uploadedFiles = [];
-    
-    for (const file of files) {
-      try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${user?.id}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('chat-files')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('chat-files')
-          .getPublicUrl(filePath);
-
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-
-        uploadedFiles.push({
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          url: publicUrl,
-          base64: base64
-        });
-      } catch (error: any) {
-        console.error('Ошибка загрузки файла:', error);
-        toast({
-          title: "Ошибка",
-          description: `Не удалось загрузить файл ${file.name}`,
-          variant: "destructive",
-        });
-      }
-    }
-    
-    return uploadedFiles;
-  };
-
-  const sendMessage = async () => {
-    if ((!inputValue.trim() && attachedFiles.length === 0) || !chatId || loading) return;
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    setIsLoading(true);
+    scrollToBottom();
 
     try {
-      const { data: canSend, error } = await supabase.rpc('check_daily_message_limit', {
-        user_uuid: user?.id
-      });
-
-      if (error) throw error;
-
-      if (!canSend) {
-        toast({
-          title: "Лимит исчерпан",
-          description: `Вы достигли дневного лимита в ${dailyLimit} сообщений. Попробуйте завтра.`,
-          variant: "destructive",
-        });
-        return;
-      }
-    } catch (error) {
-      console.error('Ошибка проверки лимита:', error);
-    }
-
-    setLoading(true);
-
-    try {
-      let attachmentsData = [];
-      
-      if (attachedFiles.length > 0) {
-        attachmentsData = await uploadFiles(attachedFiles);
-      }
-
-      const { data: userMessage, error: userError } = await supabase
-        .from('messages')
-        .insert([
-          {
-            chat_id: chatId,
-            content: inputValue,
-            role: 'user',
-            attachments: attachmentsData
-          }
-        ])
-        .select()
-        .single();
-
-      if (userError) throw userError;
-
-      const typedUserMessage: Message = {
-        id: userMessage.id,
-        content: userMessage.content,
-        role: 'user',
-        attachments: Array.isArray(userMessage.attachments) ? userMessage.attachments : [],
-        created_at: userMessage.created_at || new Date().toISOString()
-      };
-
-      setMessages(prev => [...prev, typedUserMessage]);
-      const currentInput = inputValue;
-      setInputValue('');
-      setAttachedFiles([]);
-
-      try {
-        await supabase.rpc('increment_daily_message_count', {
-          user_uuid: user?.id
-        });
-        setMessagesUsed(prev => prev + 1);
-      } catch (error) {
-        console.error('Ошибка обновления счетчика сообщений:', error);
-      }
-
-      const allMessages = [...messages, typedUserMessage];
-      const contextMessages = getMessagesForContext(
-        allMessages.map(msg => ({ role: msg.role, content: msg.content })),
-        dialogSummary
-      );
-
-      try {
-        await supabase.rpc('update_model_usage', { model_name: selectedModel });
-      } catch (error) {
-        console.error('Ошибка обновления статистики модели:', error);
-      }
-
-      const { data: apiResponse, error: apiError } = await supabase.functions.invoke('vsegpt-chat', {
+      const { data, error } = await supabase.functions.invoke('get-chat-response', {
         body: {
-          messages: contextMessages,
-          prompt: currentInput,
+          message: inputMessage,
+          chatId: chatId,
           model: selectedModel,
-          attachments: attachmentsData
+          userId: user?.id
         }
       });
 
-      if (apiError) throw apiError;
-
-      const { data: botMessage, error: botError } = await supabase
-        .from('messages')
-        .insert([
-          {
-            chat_id: chatId,
-            content: apiResponse.response || 'Произошла ошибка при получении ответа',
-            role: 'assistant',
-            attachments: []
-          }
-        ])
-        .select()
-        .single();
-
-      if (botError) throw botError;
-
-      const typedBotMessage: Message = {
-        id: botMessage.id,
-        content: botMessage.content,
-        role: 'assistant',
-        attachments: Array.isArray(botMessage.attachments) ? botMessage.attachments : [],
-        created_at: botMessage.created_at || new Date().toISOString()
-      };
-
-      setMessages(prev => [...prev, typedBotMessage]);
-
-      const newMessageCount = allMessages.length + 1;
-      if (shouldSummarize(newMessageCount) && !dialogSummary) {
-        const summaryMessages = [...allMessages, typedBotMessage].map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
-        const newSummary = await summarizeDialog(summaryMessages);
-        setDialogSummary(newSummary);
-        await saveChatSummary(newSummary);
+      if (error) {
+        console.error('Ошибка при вызове функции:', error);
+        setMessages(prev => [...prev, {
+          id: new Date().getTime().toString(),
+          created_at: new Date().toISOString(),
+          content: 'Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз.',
+          role: 'assistant',
+          attachments: []
+        }]);
+      } else {
+        setMessages(prev => [...prev, {
+          id: new Date().getTime().toString(),
+          created_at: new Date().toISOString(),
+          content: data.response,
+          role: 'assistant',
+          attachments: data.attachments || []
+        }]);
       }
-
-    } catch (error: any) {
-      console.error('Error sending message:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось отправить сообщение",
-        variant: "destructive",
-      });
+    } catch (error) {
+      console.error('Непредвиденная ошибка:', error);
+      setMessages(prev => [...prev, {
+        id: new Date().getTime().toString(),
+        created_at: new Date().toISOString(),
+        content: 'Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже.',
+        role: 'assistant',
+        attachments: []
+      }]);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
+      scrollToBottom();
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
+  const saveChatTitle = async () => {
+    if (!chatTitle.trim() || !chatId) return;
+
+    try {
+      await supabase
+        .from('chats')
+        .update({ title: chatTitle.trim() })
+        .eq('id', chatId);
+      setIsEditingTitle(false);
+    } catch (error) {
+      console.error('Ошибка обновления названия чата:', error);
     }
   };
-
-  if (!chatId) {
-    return (
-      <div className={`flex-1 flex flex-col ${getBackgroundClass(chatBackground)}`}>
-        <div className="p-4 border-b border-gray-600">
-          <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center max-w-md">
-            <Bot className="w-20 h-20 text-gray-400 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold text-white mb-3">Добро пожаловать в чат с AI</h2>
-            <p className="text-gray-400 mb-6">Выберите чат или создайте новый для начала общения с искусственным интеллектом</p>
-            <div className="bg-gray-700 rounded-2xl p-6 shadow-lg border border-gray-600">
-              <p className="text-sm text-gray-300">
-                🎯 Поддерживаются изображения, PDF и текстовые файлы<br/>
-                🧠 Контекст сохраняется в каждом отдельном диалоге<br/>
-                ⚡ Быстрые и точные ответы от современных AI моделей
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className={`flex-1 flex flex-col ${getBackgroundClass(chatBackground)} min-h-0`}>
-      <div className="bg-gray-700 border-b border-gray-600 p-4 space-y-4 flex-shrink-0">
-        <ModelSelector 
-          selectedModel={selectedModel} 
-          onModelChange={handleModelChange}
-          disabled={isChangingModel}
-        />
-        
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-white">{chatTitle}</h2>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Folder className="w-4 h-4 text-gray-400" />
-            <Select value={currentFolderId || 'none'} onValueChange={handleFolderChange}>
-              <SelectTrigger className="w-[200px] bg-gray-700 border-gray-600 text-white">
-                <SelectValue placeholder="Выберите папку" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
-                <SelectItem value="none" className="text-gray-300 hover:bg-gray-600">
-                  Без папки
-                </SelectItem>
-                {folders.map((folder) => (
-                  <SelectItem key={folder.id} value={folder.id} className="text-gray-300 hover:bg-gray-600">
-                    {folder.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+    <div className="flex-1 flex flex-col bg-white min-w-0 max-h-screen">
+      <ModelSelector
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        disabled={isLoading}
+      />
       
-      <div className="bg-gray-700 border-b border-gray-600 px-4 py-2 flex-shrink-0">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="text-sm text-blue-300">
-            📊 Сообщений сегодня: {messagesUsed} / {dailyLimit}
-          </div>
-          {dialogSummary && (
-            <div className="text-sm text-blue-300">
-              💭 Контекст: {dialogSummary.substring(0, 50)}...
+      <div className="flex-1 flex flex-col min-h-0">
+        {chatId && (
+          <div className="border-b border-gray-200 p-4 bg-gray-50">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {isEditingTitle ? (
+                  <input
+                    type="text"
+                    value={chatTitle}
+                    onChange={(e) => setChatTitle(e.target.value)}
+                    onBlur={saveChatTitle}
+                    onKeyPress={(e) => e.key === 'Enter' && saveChatTitle()}
+                    className="bg-transparent border-b border-gray-400 text-lg font-semibold outline-none flex-1 min-w-0"
+                    autoFocus
+                  />
+                ) : (
+                  <h2 
+                    className="text-lg font-semibold text-gray-800 cursor-pointer hover:text-blue-600 flex-1 min-w-0 truncate"
+                    onClick={() => setIsEditingTitle(true)}
+                  >
+                    {chatTitle}
+                  </h2>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditingTitle(!isEditingTitle)}
+                  className="text-gray-500 hover:text-gray-700 flex-shrink-0"
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              <div className="flex-shrink-0">
+                <ChatFolderSelector
+                  currentFolderId={currentFolderId}
+                  onFolderChange={handleFolderChange}
+                  chatId={chatId}
+                  onUpdate={loadChatDetails}
+                />
+              </div>
             </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-6 min-h-0">
-        <div className="max-w-4xl mx-auto space-y-6">
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
           {messages.map((message) => (
             <div
               key={message.id}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`flex max-w-xs lg:max-w-2xl ${
-                  message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                  message.role === 'user'
+                    ? 'bg-blue-600 text-white ml-12'
+                    : 'bg-gray-100 text-gray-800 mr-12'
                 }`}
               >
-                <div className={`flex-shrink-0 ${message.role === 'user' ? 'ml-3' : 'mr-3'}`}>
-                  {message.role === 'user' ? (
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage src={profile?.avatar_url} />
-                      <AvatarFallback className="bg-blue-500 text-white">
-                        {profile?.first_name?.[0] || user?.email?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-gray-600 text-white shadow-md">
-                      <span className="text-lg">{getModelIcon(selectedModel)}</span>
-                    </div>
-                  )}
-                </div>
-                <div
-                  className={`px-6 py-4 rounded-2xl shadow-lg ${
-                    message.role === 'user'
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-100 border border-gray-600'
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                  {message.attachments.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {message.attachments.map((attachment: any, idx: number) => (
-                        <div key={idx} className={`text-sm ${message.role === 'user' ? 'text-blue-100' : 'text-gray-300'} flex items-center`}>
-                          <Paperclip className="w-4 h-4 mr-2" />
-                          {attachment.name}
-                          {attachment.url && (
-                            <a 
-                              href={attachment.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="ml-2 underline hover:no-underline"
-                            >
-                              открыть
-                            </a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                {message.attachments && message.attachments.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {message.attachments.map((attachment: any, index: number) => (
+                      <div key={index} className="text-sm opacity-75">
+                        📎 {attachment.name || 'Файл'}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
+          
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-gray-100 rounded-2xl px-4 py-3 mr-12">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
-      </div>
 
-      <div className="border-t border-gray-600 bg-gray-800 p-6 flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex gap-4 items-end">
-            <FileUpload
-              attachedFiles={attachedFiles}
-              onFilesChange={setAttachedFiles}
-              disabled={loading || isChangingModel}
-            />
-            
-            <div className="flex-1 relative">
+        <form onSubmit={handleSubmit} className="border-t border-gray-200 p-4 bg-white">
+          <div className="flex gap-3 items-end">
+            <div className="flex-1 min-w-0">
               <Textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Введите сообщение..."
-                className="min-h-[60px] max-h-32 resize-none bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-blue-500 rounded-2xl pr-16"
-                disabled={loading || isChangingModel}
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                placeholder={chatId ? "Введите сообщение..." : "Создайте новый чат, чтобы начать общение"}
+                rows={1}
+                className="resize-none min-h-[44px] max-h-32 bg-gray-50 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                style={{ 
+                  height: 'auto',
+                  minHeight: '44px'
+                }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = Math.min(target.scrollHeight, 128) + 'px';
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e as any);
+                  }
+                }}
+                disabled={!chatId || isLoading}
               />
-              <Button
-                onClick={sendMessage}
-                disabled={loading || isChangingModel || (!inputValue.trim() && attachedFiles.length === 0) || messagesUsed >= dailyLimit}
-                size="icon"
-                className="absolute right-2 bottom-2 h-10 w-10 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl shadow-lg"
-              >
-                {loading ? <Spinner size="sm" /> : <Send className="w-4 h-4" />}
-              </Button>
             </div>
+            
+            <Button
+              type="submit"
+              disabled={!chatId || !inputMessage.trim() || isLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 flex-shrink-0"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

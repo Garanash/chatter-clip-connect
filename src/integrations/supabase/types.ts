@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       chat_folders: {
         Row: {
+          color: string | null
           created_at: string
           icon_url: string | null
           id: string
@@ -20,6 +21,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          color?: string | null
           created_at?: string
           icon_url?: string | null
           id?: string
@@ -29,6 +31,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          color?: string | null
           created_at?: string
           icon_url?: string | null
           id?: string
@@ -160,30 +163,48 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          bio: string | null
+          birth_date: string | null
           created_at: string | null
           email: string | null
           first_name: string | null
           id: string
           last_name: string | null
+          location: string | null
+          nickname: string | null
+          phone: string | null
           role: string | null
+          website: string | null
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
+          birth_date?: string | null
           created_at?: string | null
           email?: string | null
           first_name?: string | null
           id: string
           last_name?: string | null
+          location?: string | null
+          nickname?: string | null
+          phone?: string | null
           role?: string | null
+          website?: string | null
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
+          birth_date?: string | null
           created_at?: string | null
           email?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
+          location?: string | null
+          nickname?: string | null
+          phone?: string | null
           role?: string | null
+          website?: string | null
         }
         Relationships: []
       }
@@ -195,6 +216,7 @@ export type Database = {
           id: string
           last_message_date: string | null
           messages_sent_today: number
+          selected_model: string | null
           updated_at: string
           user_id: string
         }
@@ -205,6 +227,7 @@ export type Database = {
           id?: string
           last_message_date?: string | null
           messages_sent_today?: number
+          selected_model?: string | null
           updated_at?: string
           user_id: string
         }
@@ -215,6 +238,7 @@ export type Database = {
           id?: string
           last_message_date?: string | null
           messages_sent_today?: number
+          selected_model?: string | null
           updated_at?: string
           user_id?: string
         }
