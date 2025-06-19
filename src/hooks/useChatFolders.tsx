@@ -9,6 +9,7 @@ interface ChatFolder {
   name: string;
   icon_url: string | null;
   position: number;
+  color: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -39,7 +40,6 @@ export function useChatFolders() {
     if (!user) return;
 
     try {
-      // Загружаем папки
       const { data: foldersData, error: foldersError } = await supabase
         .from('chat_folders')
         .select('*')
@@ -48,7 +48,6 @@ export function useChatFolders() {
 
       if (foldersError) throw foldersError;
 
-      // Загружаем чаты
       const { data: chatsData, error: chatsError } = await supabase
         .from('chats')
         .select('*')
@@ -71,7 +70,7 @@ export function useChatFolders() {
     }
   };
 
-  const createFolder = async (name: string, iconUrl?: string) => {
+  const createFolder = async (name: string, color?: string, iconUrl?: string) => {
     if (!user) return;
 
     try {
@@ -80,6 +79,7 @@ export function useChatFolders() {
         .insert([{
           user_id: user.id,
           name,
+          color: color || '#3B82F6',
           icon_url: iconUrl || null,
           position: folders.length
         }])
@@ -93,11 +93,40 @@ export function useChatFolders() {
         title: "Успешно",
         description: "Папка создана",
       });
+      
+      return data;
     } catch (error) {
       console.error('Ошибка создания папки:', error);
       toast({
         title: "Ошибка",
         description: "Не удалось создать папку",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateFolder = async (folderId: string, updates: Partial<ChatFolder>) => {
+    try {
+      const { error } = await supabase
+        .from('chat_folders')
+        .update(updates)
+        .eq('id', folderId);
+
+      if (error) throw error;
+
+      setFolders(prev => prev.map(folder => 
+        folder.id === folderId ? { ...folder, ...updates } : folder
+      ));
+
+      toast({
+        title: "Успешно",
+        description: "Папка обновлена",
+      });
+    } catch (error) {
+      console.error('Ошибка обновления папки:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось обновить папку",
         variant: "destructive",
       });
     }
@@ -142,6 +171,9 @@ export function useChatFolders() {
       setChats(prev => prev.map(chat => 
         chat.id === chatId ? { ...chat, folder_id: folderId } : chat
       ));
+      
+      // Обновляем данные для синхронизации
+      await loadFoldersAndChats();
     } catch (error) {
       console.error('Ошибка перемещения чата:', error);
       toast({
@@ -154,13 +186,11 @@ export function useChatFolders() {
 
   const deleteFolder = async (folderId: string) => {
     try {
-      // Сначала перемещаем все чаты из папки в корень
       await supabase
         .from('chats')
         .update({ folder_id: null })
         .eq('folder_id', folderId);
 
-      // Затем удаляем папку
       const { error } = await supabase
         .from('chat_folders')
         .delete()
@@ -192,6 +222,7 @@ export function useChatFolders() {
     chats,
     loading,
     createFolder,
+    updateFolder,
     updateChatTitle,
     moveChatToFolder,
     deleteFolder,

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -55,7 +56,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      const formattedMessages: Message[] = (data || []).map(msg => ({
+        id: msg.id,
+        created_at: msg.created_at || '',
+        content: msg.content,
+        role: (msg.role === 'user' || msg.role === 'assistant') ? msg.role as 'user' | 'assistant' : 'user',
+        attachments: Array.isArray(msg.attachments) ? msg.attachments : []
+      }));
+      
+      setMessages(formattedMessages);
       scrollToBottom();
     } catch (error) {
       console.error('Ошибка загрузки сообщений:', error);
@@ -82,7 +92,22 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   };
 
   const handleFolderChange = async (folderId: string | null) => {
-    setCurrentFolderId(folderId);
+    if (!chatId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('chats')
+        .update({ folder_id: folderId })
+        .eq('id', chatId);
+
+      if (error) throw error;
+      
+      setCurrentFolderId(folderId);
+      // Обновляем страницу для отображения изменений
+      await loadChatDetails();
+    } catch (error) {
+      console.error('Ошибка перемещения чата:', error);
+    }
   };
 
   const scrollToBottom = () => {
@@ -93,11 +118,11 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     e.preventDefault();
     if (!inputMessage.trim() || !chatId) return;
 
-    const userMessage = {
+    const userMessage: Message = {
       id: new Date().getTime().toString(),
       created_at: new Date().toISOString(),
       content: inputMessage,
-      role: 'user',
+      role: 'user' as const,
       attachments: []
     };
 
@@ -107,12 +132,15 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     scrollToBottom();
 
     try {
-      const { data, error } = await supabase.functions.invoke('get-chat-response', {
+      const { data, error } = await supabase.functions.invoke('vsegpt-chat', {
         body: {
-          message: inputMessage,
-          chatId: chatId,
-          model: selectedModel,
-          userId: user?.id
+          messages: [
+            {
+              role: 'user',
+              content: inputMessage
+            }
+          ],
+          model: selectedModel
         }
       });
 
@@ -122,16 +150,32 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
           id: new Date().getTime().toString(),
           created_at: new Date().toISOString(),
           content: 'Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз.',
-          role: 'assistant',
+          role: 'assistant' as const,
           attachments: []
         }]);
       } else {
+        // Сохраняем сообщения в базу данных
+        await supabase
+          .from('messages')
+          .insert([
+            {
+              chat_id: chatId,
+              content: inputMessage,
+              role: 'user'
+            },
+            {
+              chat_id: chatId,
+              content: data.response || 'Ответ не получен',
+              role: 'assistant'
+            }
+          ]);
+
         setMessages(prev => [...prev, {
           id: new Date().getTime().toString(),
           created_at: new Date().toISOString(),
-          content: data.response,
-          role: 'assistant',
-          attachments: data.attachments || []
+          content: data.response || 'Ответ не получен',
+          role: 'assistant' as const,
+          attachments: []
         }]);
       }
     } catch (error) {
@@ -140,7 +184,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         id: new Date().getTime().toString(),
         created_at: new Date().toISOString(),
         content: 'Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже.',
-        role: 'assistant',
+        role: 'assistant' as const,
         attachments: []
       }]);
     } finally {
