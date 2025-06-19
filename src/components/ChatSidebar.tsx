@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { Plus, Settings, LogOut, Users, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
