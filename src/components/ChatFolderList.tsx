@@ -1,10 +1,11 @@
 
 import { useState } from 'react';
+import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useChatFolders } from '@/hooks/useChatFolders';
-import { LoadingSpinner } from '@/components/ui/spinner';
-import { FolderCreator } from './chat-folders/FolderCreator';
 import { FolderItem } from './chat-folders/FolderItem';
 import { ChatItem } from './chat-folders/ChatItem';
+import { FolderCreator } from './chat-folders/FolderCreator';
 
 interface ChatFolderListProps {
   currentChatId: string | null;
@@ -13,14 +14,9 @@ interface ChatFolderListProps {
 }
 
 export function ChatFolderList({ currentChatId, onChatSelect, onChatDeleted }: ChatFolderListProps) {
-  const { folders, chats, loading, createFolder, updateChatTitle, moveChatToFolder, deleteFolder } = useChatFolders();
+  const { folders, chats, loading, createFolder, updateFolder, updateChatTitle, moveChatToFolder, deleteFolder } = useChatFolders();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [editingChat, setEditingChat] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
-
-  if (loading) {
-    return <LoadingSpinner message="Загрузка папок..." />;
-  }
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
 
   const toggleFolder = (folderId: string) => {
     const newExpanded = new Set(expandedFolders);
@@ -32,58 +28,91 @@ export function ChatFolderList({ currentChatId, onChatSelect, onChatDeleted }: C
     setExpandedFolders(newExpanded);
   };
 
-  const handleEditChat = (chat: any) => {
-    setEditingChat(chat.id);
-    setEditingTitle(chat.title);
+  const handleCreateFolder = async (name: string, color?: string, iconUrl?: string) => {
+    await createFolder(name, color, iconUrl);
+    setShowCreateFolder(false);
   };
 
-  const handleSaveTitle = async () => {
-    if (editingChat && editingTitle.trim()) {
-      await updateChatTitle(editingChat, editingTitle.trim());
-      setEditingChat(null);
-      setEditingTitle('');
-    }
-  };
+  const unorganizedChats = chats.filter(chat => !chat.folder_id);
 
-  const chatsInFolder = (folderId: string | null) => {
-    return chats.filter(chat => chat.folder_id === folderId);
-  };
-
-  const rootChats = chatsInFolder(null);
+  if (loading) {
+    return <div className="text-gray-400 text-sm">Загрузка...</div>;
+  }
 
   return (
     <div className="space-y-2">
-      <FolderCreator onCreateFolder={createFolder} />
+      {/* Folders */}
+      {folders.map((folder) => {
+        const folderChats = chats.filter(chat => chat.folder_id === folder.id);
+        const isExpanded = expandedFolders.has(folder.id);
 
-      {folders.map((folder) => (
-        <FolderItem
-          key={folder.id}
-          folder={folder}
-          chats={chatsInFolder(folder.id)}
-          isExpanded={expandedFolders.has(folder.id)}
-          onToggleExpanded={() => toggleFolder(folder.id)}
-          onDeleteFolder={deleteFolder}
-          currentChatId={currentChatId}
-          onChatSelect={onChatSelect}
-          onUpdateChatTitle={updateChatTitle}
-          onChatDeleted={onChatDeleted}
-        />
-      ))}
+        return (
+          <div key={folder.id} className="space-y-1">
+            <FolderItem
+              folder={folder}
+              isExpanded={isExpanded}
+              onToggle={() => toggleFolder(folder.id)}
+              onUpdate={updateFolder}
+              onDelete={deleteFolder}
+              onMoveChat={moveChatToFolder}
+            />
+            
+            {isExpanded && (
+              <div className="ml-4 space-y-1">
+                {folderChats.map((chat) => (
+                  <ChatItem
+                    key={chat.id}
+                    chat={chat}
+                    isActive={currentChatId === chat.id}
+                    onSelect={onChatSelect}
+                    onTitleUpdate={updateChatTitle}
+                    onDelete={onChatDeleted}
+                    onMoveToFolder={moveChatToFolder}
+                    folders={folders}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
-      {rootChats.map((chat) => (
-        <ChatItem
-          key={chat.id}
-          chat={chat}
-          currentChatId={currentChatId}
-          onChatSelect={onChatSelect}
-          onEditChat={handleEditChat}
-          editingChat={editingChat}
-          editingTitle={editingTitle}
-          setEditingTitle={setEditingTitle}
-          onSaveTitle={handleSaveTitle}
-          onChatDeleted={onChatDeleted}
-        />
-      ))}
+      {/* Unorganized Chats */}
+      {unorganizedChats.length > 0 && (
+        <div className="space-y-1">
+          {unorganizedChats.map((chat) => (
+            <ChatItem
+              key={chat.id}
+              chat={chat}
+              isActive={currentChatId === chat.id}
+              onSelect={onChatSelect}
+              onTitleUpdate={updateChatTitle}
+              onDelete={onChatDeleted}
+              onMoveToFolder={moveChatToFolder}
+              folders={folders}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Create Folder Button */}
+      <div className="pt-2 border-t border-gray-700">
+        {showCreateFolder ? (
+          <FolderCreator
+            onCreateFolder={handleCreateFolder}
+            onCancel={() => setShowCreateFolder(false)}
+          />
+        ) : (
+          <Button
+            onClick={() => setShowCreateFolder(true)}
+            variant="ghost"
+            className="w-full justify-start text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-xl"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Создать папку
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
