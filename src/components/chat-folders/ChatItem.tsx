@@ -24,29 +24,38 @@ interface Chat {
   updated_at: string;
 }
 
+interface ChatFolder {
+  id: string;
+  name: string;
+  icon_url: string | null;
+  position: number;
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ChatItemProps {
   chat: Chat;
-  currentChatId: string | null;
-  onChatSelect: (chatId: string) => void;
-  onEditChat: (chat: Chat) => void;
-  editingChat: string | null;
-  editingTitle: string;
-  setEditingTitle: (title: string) => void;
-  onSaveTitle: () => void;
-  onChatDeleted: () => void;
+  isActive: boolean;
+  onSelect: (chatId: string) => void;
+  onTitleUpdate: (chatId: string, newTitle: string) => Promise<void>;
+  onDelete: () => void;
+  onMoveToFolder: (chatId: string, folderId: string | null) => Promise<void>;
+  folders: ChatFolder[];
 }
 
 export function ChatItem({ 
   chat, 
-  currentChatId, 
-  onChatSelect, 
-  onEditChat, 
-  editingChat, 
-  editingTitle, 
-  setEditingTitle, 
-  onSaveTitle, 
-  onChatDeleted 
+  isActive, 
+  onSelect, 
+  onTitleUpdate, 
+  onDelete, 
+  onMoveToFolder,
+  folders
 }: ChatItemProps) {
+  const [editingTitle, setEditingTitle] = React.useState('');
+  const [isEditing, setIsEditing] = React.useState(false);
+
   const deleteChat = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     
@@ -65,31 +74,42 @@ export function ChatItem({
 
       if (error) throw error;
 
-      if (currentChatId === chatId) {
-        onChatDeleted();
-      }
+      onDelete();
     } catch (error: any) {
       console.error('Ошибка удаления чата:', error);
+    }
+  };
+
+  const handleEditStart = () => {
+    setIsEditing(true);
+    setEditingTitle(chat.title);
+  };
+
+  const handleSaveTitle = async () => {
+    if (editingTitle.trim()) {
+      await onTitleUpdate(chat.id, editingTitle.trim());
+      setIsEditing(false);
+      setEditingTitle('');
     }
   };
 
   return (
     <div
       className={`group relative p-3 rounded-xl hover:bg-gray-800 transition-colors cursor-pointer ${
-        currentChatId === chat.id ? 'bg-gray-700' : ''
+        isActive ? 'bg-gray-700' : ''
       }`}
-      onClick={() => onChatSelect(chat.id)}
+      onClick={() => onSelect(chat.id)}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center flex-1 min-w-0">
           <MessageSquare className="w-4 h-4 mr-3 text-gray-400 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            {editingChat === chat.id ? (
+            {isEditing ? (
               <Input
                 value={editingTitle}
                 onChange={(e) => setEditingTitle(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && onSaveTitle()}
-                onBlur={onSaveTitle}
+                onKeyPress={(e) => e.key === 'Enter' && handleSaveTitle()}
+                onBlur={handleSaveTitle}
                 className="text-sm bg-gray-700 border-gray-600 text-white"
                 onClick={(e) => e.stopPropagation()}
               />
@@ -118,7 +138,7 @@ export function ChatItem({
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
-                onEditChat(chat);
+                handleEditStart();
               }}
               className="text-blue-400 hover:text-blue-300 hover:bg-gray-700"
             >
