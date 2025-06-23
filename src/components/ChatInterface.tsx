@@ -36,12 +36,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   useEffect(() => {
     if (chatId) {
       loadMessages();
-    }
-  }, [chatId]);
-
-  useEffect(() => {
-    if (chatId) {
       loadChatDetails();
+    } else {
+      // Очищаем состояние для нового чата
+      setMessages([]);
+      setChatTitle('Новый чат');
+      setCurrentFolderId(null);
     }
   }, [chatId]);
 
@@ -103,7 +103,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       if (error) throw error;
       
       setCurrentFolderId(folderId);
-      // Обновляем страницу для отображения изменений
       await loadChatDetails();
     } catch (error) {
       console.error('Ошибка перемещения чата:', error);
@@ -116,7 +115,36 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
-    if (!inputMessage.trim() || !chatId) return;
+    if (!inputMessage.trim()) return;
+
+    // Если нет активного чата, создаём новый
+    let currentChatId = chatId;
+    if (!currentChatId && user) {
+      try {
+        const { data, error } = await supabase
+          .from('chats')
+          .insert([{
+            user_id: user.id,
+            title: inputMessage.slice(0, 50) + (inputMessage.length > 50 ? '...' : ''),
+            folder_id: currentFolderId
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        currentChatId = data.id;
+        setChatTitle(data.title);
+        
+        // Уведомляем родительский компонент о новом чате
+        window.location.href = `/chat/${currentChatId}`;
+        return;
+      } catch (error) {
+        console.error('Ошибка создания чата:', error);
+        return;
+      }
+    }
+
+    if (!currentChatId) return;
 
     const userMessage: Message = {
       id: new Date().getTime().toString(),
@@ -159,12 +187,12 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
           .from('messages')
           .insert([
             {
-              chat_id: chatId,
+              chat_id: currentChatId,
               content: inputMessage,
               role: 'user'
             },
             {
-              chat_id: chatId,
+              chat_id: currentChatId,
               content: data.response || 'Ответ не получен',
               role: 'assistant'
             }
@@ -207,11 +235,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     }
   };
 
+  const handleModelChange = (model: string) => {
+    // Только обновляем модель, не сохраняем контекст для пустых диалогов
+    setSelectedModel(model);
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-white min-w-0 max-h-screen">
       <ModelSelector
         selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
+        onModelChange={handleModelChange}
         disabled={isLoading}
       />
       
@@ -261,6 +294,15 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         )}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+          {messages.length === 0 && !chatId && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-gray-500">
+                <h3 className="text-lg font-medium mb-2">Добро пожаловать!</h3>
+                <p>Начните новый разговор, написав сообщение ниже.</p>
+              </div>
+            </div>
+          )}
+          
           {messages.map((message) => (
             <div
               key={message.id}
@@ -307,7 +349,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
               <Textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder={chatId ? "Введите сообщение..." : "Создайте новый чат, чтобы начать общение"}
+                placeholder="Введите сообщение..."
                 rows={1}
                 className="resize-none min-h-[44px] max-h-32 bg-gray-50 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                 style={{ 
@@ -325,13 +367,13 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                     handleSubmit(e as any);
                   }
                 }}
-                disabled={!chatId || isLoading}
+                disabled={isLoading}
               />
             </div>
             
             <Button
               type="submit"
-              disabled={!chatId || !inputMessage.trim() || isLoading}
+              disabled={!inputMessage.trim() || isLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 h-11 flex-shrink-0"
             >
               <Send className="w-4 h-4" />

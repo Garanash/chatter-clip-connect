@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Plus, Settings, LogOut, Users, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,31 +21,10 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPan
   const { toast } = useToast();
   const [showProfilePanel, setShowProfilePanel] = useState(false);
 
-  const handleNewChat = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('chats')
-      .insert([
-        {
-          user_id: user.id,
-          title: 'Новый чат'
-        }
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      toast({
-        title: "Ошибка",
-        description: "Не удалось создать новый чат",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleNewChat = () => {
+    // Просто переходим на пустую страницу чата
     onNewChat();
-    onChatSelect(data.id);
+    window.location.href = '/chat';
   };
 
   const handleProfileClick = () => {
