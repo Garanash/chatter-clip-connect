@@ -1,11 +1,11 @@
+
 import { useState } from 'react';
-import { Plus, Settings, LogOut, Users, User } from 'lucide-react';
+import { Plus, LogOut, Users, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { ChatFolderList } from './ChatFolderList';
 import { GlassProfilePanel } from './GlassProfilePanel';
+import { useNavigate } from 'react-router-dom';
 
 interface ChatSidebarProps {
   currentChatId: string | null;
@@ -18,13 +18,17 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPanel, onProfilePanel, isCollapsed }: ChatSidebarProps) {
   const { user, profile, signOut } = useAuth();
-  const { toast } = useToast();
   const [showProfilePanel, setShowProfilePanel] = useState(false);
+  const navigate = useNavigate();
 
   const handleNewChat = () => {
     // Просто переходим на пустую страницу чата
     onNewChat();
-    window.location.href = '/chat';
+    navigate('/chat');
+  };
+
+  const handleAdminClick = () => {
+    navigate('/admin');
   };
 
   const handleProfileClick = () => {
@@ -116,7 +120,7 @@ export function ChatSidebar({ currentChatId, onChatSelect, onNewChat, onAdminPan
 
           {profile?.role === 'admin' && (
             <Button
-              onClick={onAdminPanel}
+              onClick={handleAdminClick}
               variant="ghost"
               className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-xl backdrop-blur-sm"
             >

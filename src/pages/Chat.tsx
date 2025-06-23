@@ -1,20 +1,25 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { CollapsibleSidebar } from '@/components/CollapsibleSidebar';
 import { ChatInterface } from '@/components/ChatInterface';
-import { AdminPanel } from '@/components/AdminPanel';
 import { UserProfile } from '@/components/UserProfile';
 import { UserStats } from '@/components/UserStats';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, BarChart } from 'lucide-react';
 
-type View = 'chat' | 'admin' | 'profile';
+type View = 'chat' | 'profile';
 type ProfileView = 'profile' | 'stats';
 
 export default function Chat() {
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const { id } = useParams();
+  const [currentChatId, setCurrentChatId] = useState<string | null>(id || null);
   const [currentView, setCurrentView] = useState<View>('chat');
   const [profileView, setProfileView] = useState<ProfileView>('profile');
+
+  useEffect(() => {
+    setCurrentChatId(id || null);
+  }, [id]);
 
   const handleNewChat = () => {
     setCurrentChatId(null);
@@ -26,7 +31,7 @@ export default function Chat() {
   };
 
   const handleAdminPanel = () => {
-    setCurrentView('admin');
+    // Эта функция больше не используется, но оставляем для совместимости
   };
 
   const handleProfilePanel = () => {
@@ -102,11 +107,7 @@ export default function Chat() {
         onProfilePanel={handleProfilePanel}
       />
       
-      {currentView === 'chat' ? (
-        <ChatInterface chatId={currentChatId} />
-      ) : (
-        <AdminPanel onBack={handleBackToChat} />
-      )}
+      <ChatInterface chatId={currentChatId} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Users, UserCheck, Settings } from 'lucide-react';
+import { Plus, Users, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,11 +24,7 @@ interface Profile {
   created_at: string;
 }
 
-interface AdminPanelProps {
-  onBack: () => void;
-}
-
-export function AdminPanel({ onBack }: AdminPanelProps) {
+export function AdminPanel() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
@@ -174,26 +170,19 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
 
   if (profile?.role !== 'admin') {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-red-600 mb-2">Доступ запрещен</h2>
           <p className="text-gray-500">У вас нет прав администратора</p>
-          <Button onClick={onBack} className="mt-4">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Назад
-          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 p-6 bg-gray-50">
+    <div className="min-h-screen p-6 bg-gray-50">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center mb-6">
-          <Button onClick={onBack} variant="ghost" className="mr-4">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
           <h1 className="text-2xl font-bold">Панель администратора</h1>
         </div>
 

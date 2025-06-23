@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import Auth from "./pages/Auth";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -18,6 +19,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   
   if (loading) return null;
   return user ? <>{children}</> : <Navigate to="/" replace />;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, profile, loading } = useAuth();
+  
+  if (loading) return null;
+  if (!user) return <Navigate to="/" replace />;
+  if (profile?.role !== 'admin') return <Navigate to="/chat" replace />;
+  return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -52,11 +62,27 @@ const App: React.FC = () => (
               } 
             />
             <Route 
+              path="/chat/:id" 
+              element={
+                <ProtectedRoute>
+                  <Chat />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/profile" 
               element={
                 <ProtectedRoute>
                   <Profile />
                 </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin" 
+              element={
+                <AdminRoute>
+                  <Admin />
+                </AdminRoute>
               } 
             />
             <Route path="*" element={<NotFound />} />

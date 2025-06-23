@@ -1,10 +1,11 @@
 
 import { useState } from 'react';
-import { Plus, MessageSquare } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface FolderCreatorProps {
   onCreateFolder: (name: string, color?: string, iconUrl?: string) => Promise<void>;
@@ -16,6 +17,7 @@ export function FolderCreator({ onCreateFolder, onCancel }: FolderCreatorProps) 
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const [newChatTitle, setNewChatTitle] = useState('');
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleCreateFolder = async () => {
     if (newFolderName.trim()) {
@@ -41,7 +43,9 @@ export function FolderCreator({ onCreateFolder, onCancel }: FolderCreatorProps) 
       if (error) throw error;
 
       // Переходим к новому чату
-      window.location.href = `/chat/${data.id}`;
+      navigate(`/chat/${data.id}`);
+      setNewChatTitle('');
+      setIsCreatingChat(false);
     } catch (error) {
       console.error('Ошибка создания чата:', error);
     }

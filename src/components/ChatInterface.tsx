@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const [chatTitle, setChatTitle] = useState('Новый чат');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
-  const { id } = useParams();
+  const navigate = useNavigate();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -115,18 +115,21 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || !user) return;
+
+    const messageContent = inputMessage;
+    setInputMessage('');
 
     // Если нет активного чата, создаём новый
     let currentChatId = chatId;
-    if (!currentChatId && user) {
+    if (!currentChatId) {
       try {
         const { data, error } = await supabase
           .from('chats')
           .insert([{
             user_id: user.id,
-            title: inputMessage.slice(0, 50) + (inputMessage.length > 50 ? '...' : ''),
-            folder_id: currentFolderId
+            title: messageContent.slice(0, 50) + (messageContent.length > 50 ? '...' : ''),
+            folder_id: null
           }])
           .select()
           .single();
@@ -135,8 +138,8 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         currentChatId = data.id;
         setChatTitle(data.title);
         
-        // Уведомляем родительский компонент о новом чате
-        window.location.href = `/chat/${currentChatId}`;
+        // Переходим к новому чату
+        navigate(`/chat/${currentChatId}`);
         return;
       } catch (error) {
         console.error('Ошибка создания чата:', error);
@@ -144,18 +147,15 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       }
     }
 
-    if (!currentChatId) return;
-
     const userMessage: Message = {
       id: new Date().getTime().toString(),
       created_at: new Date().toISOString(),
-      content: inputMessage,
+      content: messageContent,
       role: 'user' as const,
       attachments: []
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
     setIsLoading(true);
     scrollToBottom();
 
@@ -165,7 +165,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
           messages: [
             {
               role: 'user',
-              content: inputMessage
+              content: messageContent
             }
           ],
           model: selectedModel
@@ -188,7 +188,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
           .insert([
             {
               chat_id: currentChatId,
-              content: inputMessage,
+              content: messageContent,
               role: 'user'
             },
             {
@@ -236,7 +236,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   };
 
   const handleModelChange = (model: string) => {
-    // Только обновляем модель, не сохраняем контекст для пустых диалогов
     setSelectedModel(model);
   };
 
