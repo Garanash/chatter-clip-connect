@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Send, Edit } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
 import { ChatFolderSelector } from './ChatFolderSelector';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatInterfaceProps {
   chatId: string | null;
@@ -32,13 +33,13 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (chatId) {
       loadMessages();
       loadChatDetails();
     } else {
-      // Очищаем состояние для нового чата
       setMessages([]);
       setChatTitle('Новый чат');
       setCurrentFolderId(null);
@@ -46,7 +47,7 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   }, [chatId]);
 
   const loadMessages = async () => {
-    if (!chatId) return;
+    if (!chatId || !user) return;
 
     try {
       const { data, error } = await supabase
@@ -69,11 +70,16 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
       scrollToBottom();
     } catch (error) {
       console.error('Ошибка загрузки сообщений:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить сообщения",
+        variant: "destructive",
+      });
     }
   };
 
   const loadChatDetails = async () => {
-    if (!chatId) return;
+    if (!chatId || !user) return;
 
     try {
       const { data, error } = await supabase
@@ -82,30 +88,43 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         .eq('id', chatId)
         .single();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
       
-      setChatTitle(data.title);
-      setCurrentFolderId(data.folder_id);
+      if (data) {
+        setChatTitle(data.title);
+        setCurrentFolderId(data.folder_id);
+      }
     } catch (error) {
       console.error('Ошибка загрузки данных чата:', error);
     }
   };
 
   const handleFolderChange = async (folderId: string | null) => {
-    if (!chatId) return;
+    if (!chatId || !user) return;
     
     try {
       const { error } = await supabase
         .from('chats')
         .update({ folder_id: folderId })
-        .eq('id', chatId);
+        .eq('id', chatId)
+        .eq('user_id', user.id);
 
       if (error) throw error;
       
       setCurrentFolderId(folderId);
       await loadChatDetails();
+      
+      toast({
+        title: "Успешно",
+        description: "Чат перемещен в папку",
+      });
     } catch (error) {
       console.error('Ошибка перемещения чата:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось переместить чат",
+        variant: "destructive",
+      });
     }
   };
 
@@ -113,56 +132,73 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleSubmit = async (e: any) => {
+  const createNewChat = async (firstMessage: string) => {
+    if (!user) throw new Error('Пользователь не авторизован');
+
+    const { data, error } = await supabase
+      .from('chats')
+      .insert([{
+        user_id: user.id,
+        title: firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : ''),
+        folder_id: null
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim() || !user) return;
+    if (!inputMessage.trim() || !user || isLoading) return;
 
-    const messageContent = inputMessage;
+    const messageContent = inputMessage.trim();
     setInputMessage('');
-
-    // Если нет активного чата, создаём новый
-    let currentChatId = chatId;
-    if (!currentChatId) {
-      try {
-        const { data, error } = await supabase
-          .from('chats')
-          .insert([{
-            user_id: user.id,
-            title: messageContent.slice(0, 50) + (messageContent.length > 50 ? '...' : ''),
-            folder_id: null
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        currentChatId = data.id;
-        setChatTitle(data.title);
-        
-        // Переходим к новому чату
-        navigate(`/chat/${currentChatId}`);
-        return;
-      } catch (error) {
-        console.error('Ошибка создания чата:', error);
-        return;
-      }
-    }
-
-    const userMessage: Message = {
-      id: new Date().getTime().toString(),
-      created_at: new Date().toISOString(),
-      content: messageContent,
-      role: 'user' as const,
-      attachments: []
-    };
-
-    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
-    scrollToBottom();
 
     try {
-      const { data, error } = await supabase.functions.invoke('vsegpt-chat', {
+      let currentChatId = chatId;
+
+      // Создаем новый чат если его нет
+      if (!currentChatId) {
+        const newChat = await createNewChat(messageContent);
+        currentChatId = newChat.id;
+        setChatTitle(newChat.title);
+        navigate(`/chat/${currentChatId}`, { replace: true });
+      }
+
+      // Добавляем сообщение пользователя
+      const userMessage: Message = {
+        id: `temp-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        content: messageContent,
+        role: 'user' as const,
+        attachments: []
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+      scrollToBottom();
+
+      // Сохраняем сообщение пользователя в БД
+      const { error: userMessageError } = await supabase
+        .from('messages')
+        .insert([{
+          chat_id: currentChatId,
+          content: messageContent,
+          role: 'user'
+        }]);
+
+      if (userMessageError) throw userMessageError;
+
+      // Вызываем функцию AI
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('vsegpt-chat', {
         body: {
           messages: [
+            ...messages.map(msg => ({
+              role: msg.role,
+              content: msg.content
+            })),
             {
               role: 'user',
               content: messageContent
@@ -172,49 +208,58 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
         }
       });
 
-      if (error) {
-        console.error('Ошибка при вызове функции:', error);
-        setMessages(prev => [...prev, {
-          id: new Date().getTime().toString(),
-          created_at: new Date().toISOString(),
-          content: 'Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз.',
-          role: 'assistant' as const,
-          attachments: []
-        }]);
+      let assistantContent = 'Произошла ошибка при обработке вашего запроса.';
+      
+      if (!aiError && aiResponse?.response) {
+        assistantContent = aiResponse.response;
       } else {
-        // Сохраняем сообщения в базу данных
-        await supabase
-          .from('messages')
-          .insert([
-            {
-              chat_id: currentChatId,
-              content: messageContent,
-              role: 'user'
-            },
-            {
-              chat_id: currentChatId,
-              content: data.response || 'Ответ не получен',
-              role: 'assistant'
-            }
-          ]);
-
-        setMessages(prev => [...prev, {
-          id: new Date().getTime().toString(),
-          created_at: new Date().toISOString(),
-          content: data.response || 'Ответ не получен',
-          role: 'assistant' as const,
-          attachments: []
-        }]);
+        console.error('Ошибка AI:', aiError);
       }
-    } catch (error) {
-      console.error('Непредвиденная ошибка:', error);
-      setMessages(prev => [...prev, {
-        id: new Date().getTime().toString(),
+
+      // Добавляем ответ ассистента
+      const assistantMessage: Message = {
+        id: `temp-assistant-${Date.now()}`,
         created_at: new Date().toISOString(),
-        content: 'Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже.',
+        content: assistantContent,
         role: 'assistant' as const,
         attachments: []
-      }]);
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // Сохраняем ответ ассистента в БД
+      await supabase
+        .from('messages')
+        .insert([{
+          chat_id: currentChatId,
+          content: assistantContent,
+          role: 'assistant'
+        }]);
+
+      // Обновляем время последнего обновления чата
+      await supabase
+        .from('chats')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', currentChatId)
+        .eq('user_id', user.id);
+
+    } catch (error) {
+      console.error('Ошибка отправки сообщения:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось отправить сообщение",
+        variant: "destructive",
+      });
+      
+      // Добавляем сообщение об ошибке
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        content: 'Произошла ошибка при отправке сообщения. Попробуйте еще раз.',
+        role: 'assistant' as const,
+        attachments: []
+      };
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
       scrollToBottom();
@@ -222,16 +267,29 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
   };
 
   const saveChatTitle = async () => {
-    if (!chatTitle.trim() || !chatId) return;
+    if (!chatTitle.trim() || !chatId || !user) return;
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('chats')
         .update({ title: chatTitle.trim() })
-        .eq('id', chatId);
+        .eq('id', chatId)
+        .eq('user_id', user.id);
+        
+      if (error) throw error;
+      
       setIsEditingTitle(false);
+      toast({
+        title: "Успешно",
+        description: "Название чата обновлено",
+      });
     } catch (error) {
       console.error('Ошибка обновления названия чата:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось обновить название чата",
+        variant: "destructive",
+      });
     }
   };
 
@@ -315,15 +373,6 @@ export function ChatInterface({ chatId }: ChatInterfaceProps) {
                 }`}
               >
                 <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                {message.attachments && message.attachments.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    {message.attachments.map((attachment: any, index: number) => (
-                      <div key={index} className="text-sm opacity-75">
-                        📎 {attachment.name || 'Файл'}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           ))}

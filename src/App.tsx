@@ -17,23 +17,25 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
-  if (loading) return null;
+  if (loading) return <div className="flex items-center justify-center min-h-screen">Загрузка...</div>;
   return user ? <>{children}</> : <Navigate to="/" replace />;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
   
-  if (loading) return null;
+  if (loading) return <div className="flex items-center justify-center min-h-screen">Загрузка...</div>;
   if (!user) return <Navigate to="/" replace />;
-  if (profile?.role !== 'admin') return <Navigate to="/chat" replace />;
+  if (!profile || profile.role !== 'admin') {
+    return <Navigate to="/chat" replace />;
+  }
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
-  if (loading) return null;
+  if (loading) return <div className="flex items-center justify-center min-h-screen">Загрузка...</div>;
   return !user ? <>{children}</> : <Navigate to="/chat" replace />;
 }
 

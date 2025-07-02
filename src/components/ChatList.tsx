@@ -33,9 +33,29 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
   const { toast } = useToast();
 
   useEffect(() => {
-    console.log('ChatList: User changed:', user?.id);
     if (user) {
       loadChats();
+      
+      // Подписываемся на изменения в чатах
+      const subscription = supabase
+        .channel('chats-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'chats',
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            loadChats();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
     } else {
       setChats([]);
       setLoading(false);
@@ -44,13 +64,10 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
 
   const loadChats = async () => {
     if (!user) {
-      console.log('ChatList: No user, skipping chat load');
       setLoading(false);
       return;
     }
 
-    console.log('ChatList: Loading chats for user:', user.id);
-    
     try {
       const { data, error } = await supabase
         .from('chats')
@@ -59,7 +76,7 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
         .order('updated_at', { ascending: false });
 
       if (error) {
-        console.error('ChatList: Error loading chats:', error);
+        console.error('Ошибка загрузки чатов:', error);
         toast({
           title: "Ошибка",
           description: "Не удалось загрузить чаты",
@@ -68,10 +85,9 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
         return;
       }
 
-      console.log('ChatList: Loaded chats:', data);
       setChats(data || []);
     } catch (error) {
-      console.error('ChatList: Unexpected error loading chats:', error);
+      console.error('Неожиданная ошибка загрузки чатов:', error);
       toast({
         title: "Ошибка",
         description: "Произошла неожиданная ошибка",
@@ -88,8 +104,6 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
     if (!user) return;
 
     try {
-      console.log('ChatList: Deleting chat:', chatId);
-      
       // Сначала удаляем сообщения чата
       const { error: messagesError } = await supabase
         .from('messages')
@@ -97,7 +111,7 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
         .eq('chat_id', chatId);
 
       if (messagesError) {
-        console.error('ChatList: Error deleting messages:', messagesError);
+        console.error('Ошибка удаления сообщений:', messagesError);
       }
 
       // Затем удаляем сам чат
@@ -120,7 +134,7 @@ export function ChatList({ currentChatId, onChatSelect, onChatDeleted }: ChatLis
         description: "Чат удален",
       });
     } catch (error: any) {
-      console.error('ChatList: Error deleting chat:', error);
+      console.error('Ошибка удаления чата:', error);
       toast({
         title: "Ошибка",
         description: "Не удалось удалить чат",
